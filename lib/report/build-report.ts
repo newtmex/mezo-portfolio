@@ -1,8 +1,9 @@
-import { formatUnits, type Address, type PublicClient } from "viem";
+import { formatUnits, getAddress, type Address, type PublicClient } from "viem";
 
 import { erc20Abi, gaugeAbi } from "../abis";
 import { getHttpClient } from "../clients";
 import {
+  ADDRESSES,
   getManagerAddress,
   MEZO_CHAIN_ID,
   PAIRS,
@@ -38,31 +39,45 @@ export async function buildManagerRangeDepthReport(input?: {
     })),
   );
 
-  const rewardRates = await Promise.all(
-    pairSnapshots.map(async ({ pair }) => {
-      if (!pair.knownGauge) return 0n;
-      try {
-        return await client.readContract({
-          address: pair.knownGauge,
-          abi: gaugeAbi,
-          functionName: "rewardRate",
-        });
-      } catch {
-        return 0n;
-      }
-    }),
-  );
-  const mezoPerDay = rewardRates.reduce(
-    (total, rate) => total + Number(formatUnits(rate, 18)) * 86_400,
-    0,
-  );
-  const mezoPrice = lookupPriceMusd(prices, TRACKED_TOKENS[1].address, "MEZO");
+  const latestBlock = await client.getBlock();
+  const gaugePools = pairSnapshots.map(({ pool }) => pool).filter((pool) => pool.gauge);
+  const gaugeCalls = gaugePools.flatMap((pool) => [
+    { address: pool.gauge, abi: gaugeAbi, functionName: "rewardRate" as const },
+    { address: pool.gauge, abi: gaugeAbi, functionName: "periodFinish" as const },
+    { address: pool.gauge, abi: gaugeAbi, functionName: "rewardToken" as const },
+  ]);
+  const gaugeResults = await client.multicall({ contracts: gaugeCalls, allowFailure: true });
+  const aggregateEmissionRates = gaugePools.map((_, index) => {
+    const results = gaugeResults.slice(index * 3, index * 3 + 3);
+    if (results.some((result) => result.status === "failure")) return 0n;
+    const [rewardRate, periodFinish, rewardToken] = results.map((result) => result.result) as [
+      bigint,
+      bigint,
+      Address,
+    ];
+    if (
+      getAddress(rewardToken) !== ADDRESSES.mezo ||
+      periodFinish <= latestBlock.timestamp
+    ) {
+      return 0n;
+    }
+    return rewardRate;
+  });
 
   const reports = await Promise.all(
     pairSnapshots.map(({ pair, pool }) =>
       buildClRangeDepthReport({ client, pairLabel: pair.label, pool, managerAddress: manager }),
     ),
   );
+
+  const mezoPerDay = gaugePools.reduce((total, pool, index) => {
+    const report = reports.find((candidate) => candidate.gauge === pool.gauge);
+    const activeShareBps = report?.managerActiveLiquidityShareBps;
+    if (activeShareBps == null) return total;
+    const accountRate = (aggregateEmissionRates[index] * BigInt(activeShareBps)) / 10_000n;
+    return total + Number(formatUnits(accountRate, 18)) * 86_400;
+  }, 0);
+  const mezoPrice = lookupPriceMusd(prices, TRACKED_TOKENS[1].address, "MEZO");
 
   const [tokenHoldings, ...positionGroups] = await Promise.all([
     readManagerTokenHoldings({

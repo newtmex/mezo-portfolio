@@ -2,6 +2,8 @@ import { createPublicClient, defineChain, http, webSocket, type PublicClient } f
 
 import { MEZO_CHAIN_ID, MEZO_EXPLORER, MEZO_RPC_HTTP, MEZO_RPC_WSS } from "./config";
 
+const MEZO_MULTICALL3 = "0xcA11bde05977b3631167028862bE2a173976CA11" as const;
+
 export const mezoMainnet = defineChain({
   id: MEZO_CHAIN_ID,
   name: "Mezo Mainnet",
@@ -14,6 +16,11 @@ export const mezoMainnet = defineChain({
   },
   blockExplorers: {
     default: { name: "Mezo Explorer", url: MEZO_EXPLORER },
+  },
+  contracts: {
+    multicall3: {
+      address: MEZO_MULTICALL3,
+    },
   },
 });
 
