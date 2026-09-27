@@ -52,7 +52,7 @@ pnpm --filter @aurove/admin build
 ## What it shows
 
 - Portfolio / token / CL totals (Mezo API mUSD prices)
-- Per-pool tight-range depth for `MUSD/avBTCm`, `MEZO/MUSD`, `avBTCm/avMEZOm`
+- Per-pool tight-range depth for `MUSD/avBTCm`, `MEZO/MUSD`, `MEZO/BTC`, `avBTCm/avMEZOm`
 - Manager active liquidity % and price-move depth Δ %
 - Manager wallet balances and CL NFT positions (wallet + gauge-staked)
 - Live activity feed driven by WSS subscriptions

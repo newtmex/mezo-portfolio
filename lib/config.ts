@@ -30,7 +30,7 @@ export const ADDRESSES = {
   npm: getAddress("0x509Bc221df2B83927c695FA0bb0f5b21053C874c"),
 } as const;
 
-export type PairKey = "musd-avbtcm" | "mezo-musd" | "avbtcm-avmezom";
+export type PairKey = "musd-avbtcm" | "mezo-musd" | "avbtcm-avmezom" | "mezo-btc";
 
 export type PairConfig = {
   key: PairKey;
@@ -57,6 +57,13 @@ export const PAIRS: readonly PairConfig[] = [
     tokenB: ADDRESSES.musd,
     knownPool: getAddress("0x1D6e8D24c133535F2d00676F66a0e824f84765ff"),
     knownGauge: getAddress("0xa763cEE0cBE643e2381CE2B0C457b4451d59C40D"),
+  },
+  {
+    key: "mezo-btc",
+    label: "MEZO/BTC",
+    tokenA: ADDRESSES.mezo,
+    tokenB: ADDRESSES.btc,
+    knownPool: getAddress("0x907D055978943c69cffD5eD969F5603Af104aCc5"),
   },
   {
     key: "avbtcm-avmezom",
