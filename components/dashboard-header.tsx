@@ -41,8 +41,8 @@ export function DashboardHeader(props: {
         </p>
       </div>
 
-      <div className="flex flex-col items-start gap-2 sm:items-end">
-        <div className="flex flex-wrap items-center justify-end gap-2">
+      <div className="relative flex flex-col items-start gap-2 pt-10 sm:items-end sm:pt-10">
+        <div className="absolute right-0 top-0 flex items-center gap-2">
           <a
             href={explorerAddressUrl(MEZO_EXPLORER, props.manager)}
             target="_blank"
