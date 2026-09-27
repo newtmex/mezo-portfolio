@@ -12,13 +12,13 @@ export function ClPositionsTable({
     <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
       <div className="mb-3 flex items-end justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-zinc-100">Manager CL positions</h2>
+          <h2 className="text-sm font-semibold text-zinc-100">Portfolio CL positions</h2>
           <p className="text-xs text-zinc-500">Wallet + gauge-staked NFTs</p>
         </div>
         <p className="font-mono text-sm text-amber-200">{formatUsd(total)}</p>
       </div>
       {rows.length === 0 ? (
-        <p className="py-6 text-center text-sm text-zinc-500">No manager CL positions found.</p>
+        <p className="py-6 text-center text-sm text-zinc-500">No portfolio CL positions found.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">

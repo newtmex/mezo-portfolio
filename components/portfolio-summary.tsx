@@ -41,7 +41,7 @@ export function PortfolioSummary({ data }: { data: ManagerRangeDepthPayload }) {
       />
       <Kpi label="Token balances" value={formatUsd(data.holdings.tokenTotalMusd)} />
       <Kpi label="CL positions" value={formatUsd(data.holdings.clTotalMusd)} />
-      <Kpi label="Avg manager active %" value={avgShare} hint="Across three pools" />
+      <Kpi label="Avg portfolio active %" value={avgShare} hint="Across three pools" />
     </section>
   );
 }

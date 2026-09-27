@@ -23,7 +23,7 @@ export function LiveEventFeed({ events }: { events: LiveEventItem[] }) {
       <div className="mb-3">
         <h2 className="text-sm font-semibold text-zinc-100">Live on-chain activity</h2>
         <p className="text-xs text-zinc-500">
-          Mezo WSS events for the manager wallet and watched pools
+          Mezo WSS events for the portfolio wallet and watched pools
         </p>
       </div>
       <div className="min-h-[280px] flex-1 space-y-2 overflow-y-auto pr-1">

@@ -86,7 +86,7 @@ export function Dashboard() {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-6 py-8 text-center">
-          <p className="text-sm font-medium text-zinc-200">Loading manager range-depth…</p>
+          <p className="text-sm font-medium text-zinc-200">Loading portfolio range depth…</p>
           <p className="mt-2 text-xs text-zinc-500">
             Reading Mezo mainnet pools, gauges, and Mezo API prices
           </p>

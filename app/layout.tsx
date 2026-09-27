@@ -16,9 +16,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Aurove Admin · Manager Range Depth",
+  title: "Portfolio Dashboard · Range Depth",
   description:
-    "Live Mezo mainnet dashboard for manager CL tight-range depth, holdings, and on-chain activity.",
+    "Live Mezo mainnet dashboard for portfolio liquidity depth, holdings, and on-chain activity.",
 };
 
 export default function RootLayout({

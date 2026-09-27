@@ -57,7 +57,7 @@ export function PoolDepthCard({ report }: { report: ClRangeDepthReport }) {
           </p>
         </div>
         <div className="rounded-xl border border-amber-400/20 bg-amber-400/10 px-3 py-2 text-right">
-          <p className="text-[10px] uppercase tracking-wide text-amber-200/80">Manager active</p>
+          <p className="text-[10px] uppercase tracking-wide text-amber-200/80">Portfolio active</p>
           <p className="font-mono text-xl font-semibold text-amber-100">
             {report.managerActiveLiquidityShare}
           </p>
@@ -80,7 +80,7 @@ export function PoolDepthCard({ report }: { report: ClRangeDepthReport }) {
           <p className="font-mono text-zinc-200">{formatAmount(report.activeLiquidity, 4)}</p>
         </div>
         <div>
-          <p className="text-zinc-500">Manager L</p>
+          <p className="text-zinc-500">Portfolio L</p>
           <p className="font-mono text-zinc-200">
             {formatAmount(report.managerInRangeLiquidity, 4)}
           </p>
@@ -96,7 +96,7 @@ export function PoolDepthCard({ report }: { report: ClRangeDepthReport }) {
 
       {withScenario ? (
         <DepthRow
-          label="With manager liquidity"
+          label="With portfolio liquidity"
           side0={withScenario.sellToken0ToLeaveLower.formatted}
           side1={withScenario.sellToken1ToLeaveUpper.formatted}
           symbol0={report.token0.symbol}
@@ -105,7 +105,7 @@ export function PoolDepthCard({ report }: { report: ClRangeDepthReport }) {
       ) : null}
       {withoutScenario ? (
         <DepthRow
-          label="Without manager liquidity"
+          label="Without portfolio liquidity"
           side0={withoutScenario.sellToken0ToLeaveLower.formatted}
           side1={withoutScenario.sellToken1ToLeaveUpper.formatted}
           symbol0={report.token0.symbol}
@@ -139,7 +139,7 @@ export function PoolDepthCard({ report }: { report: ClRangeDepthReport }) {
             .join(", ")}
         </p>
       ) : (
-        <p className="text-[11px] text-zinc-500">No manager NFTs in this tight range.</p>
+        <p className="text-[11px] text-zinc-500">No portfolio NFTs in this tight range.</p>
       )}
     </article>
   );

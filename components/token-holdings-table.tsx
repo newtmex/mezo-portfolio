@@ -12,7 +12,7 @@ export function TokenHoldingsTable({
     <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
       <div className="mb-3 flex items-end justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-zinc-100">Manager token balances</h2>
+          <h2 className="text-sm font-semibold text-zinc-100">Portfolio token balances</h2>
           <p className="text-xs text-zinc-500">Mezo API mUSD prices</p>
         </div>
         <p className="font-mono text-sm text-amber-200">{formatUsd(total)}</p>

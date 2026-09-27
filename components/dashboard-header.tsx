@@ -21,7 +21,7 @@ export function DashboardHeader(props: {
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-300/80">
-            Aurove Ops
+            Portfolio Monitor
           </p>
           <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-zinc-300">
             Mezo {MEZO_CHAIN_ID}
@@ -29,13 +29,13 @@ export function DashboardHeader(props: {
           <ConnectionStatus state={props.wsState} />
         </div>
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-50 sm:text-3xl">
-          Manager range-depth
+          Portfolio range depth
         </h1>
         <p className="max-w-2xl text-sm text-zinc-400">
-          Live report of manager tight-range liquidity share, price-move depth, wallet balances,
+          Live report of portfolio tight-range liquidity share, price-move depth, wallet balances,
           and CL positions — matching{" "}
           <code className="rounded bg-white/5 px-1.5 py-0.5 text-zinc-200">
-            pnpm ops manage manager-range-depth mainnet
+            portfolio range-depth report
           </code>
           .
         </p>
