@@ -1,5 +1,7 @@
 import { MEZO_API_BASE } from "../config";
 
+const MEZO_ORIGIN = "https://mezo.org";
+
 function parseNumber(value: unknown): number | null {
   const parsed =
     typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
@@ -9,9 +11,17 @@ function parseNumber(value: unknown): number | null {
 /** Build symbol/address → mUSD price map from Mezo `/tokens` + `/pools`. */
 export async function fetchMezoPriceMapMusd(): Promise<Map<string, number>> {
   const prices = new Map<string, number>();
+  const requestInit: RequestInit & { next?: { revalidate: number } } = {
+    headers: {
+      accept: "application/json",
+      origin: MEZO_ORIGIN,
+      referer: `${MEZO_ORIGIN}/earn/pools`,
+    },
+    next: { revalidate: 30 },
+  };
   const endpoints = [
-    fetch(`${MEZO_API_BASE}/tokens`, { cache: "no-store" }),
-    fetch(`${MEZO_API_BASE}/pools?filter=none`, { cache: "no-store" }),
+    fetch(`${MEZO_API_BASE}/tokens`, requestInit),
+    fetch(`${MEZO_API_BASE}/pools`, requestInit),
   ];
   const [tokensRes, poolsRes] = await Promise.all(endpoints);
 
@@ -33,7 +43,7 @@ export async function fetchMezoPriceMapMusd(): Promise<Map<string, number>> {
 
   await Promise.all([
     logFailedResponse(`${MEZO_API_BASE}/tokens`, tokensRes),
-    logFailedResponse(`${MEZO_API_BASE}/pools?filter=none`, poolsRes),
+    logFailedResponse(`${MEZO_API_BASE}/pools`, poolsRes),
   ]);
 
   const remember = (address: unknown, symbol: unknown, price: unknown) => {

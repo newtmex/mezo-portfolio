@@ -6,6 +6,7 @@ export const MEZO_EXPLORER =
   process.env.NEXT_PUBLIC_MEZO_EXPLORER?.trim() || "https://explorer.mezo.org";
 
 export const MEZO_API_BASE =
+  process.env.MEZO_POOLS_API_BASE_URL?.trim() ||
   process.env.MEZO_API_BASE_URL?.trim() ||
   process.env.NEXT_PUBLIC_MEZO_API_BASE_URL?.trim() ||
   "https://api.mezo.org";
