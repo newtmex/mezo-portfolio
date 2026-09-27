@@ -29,6 +29,8 @@ export const ADDRESSES = {
   avMezom: getAddress("0xb894b11A78B762c82Cb095148F5BC11DC93C3560"),
   clFactory: getAddress("0xBB24AF5c6fB88F1d191FA76055e30BF881BeEb79"),
   npm: getAddress("0x509Bc221df2B83927c695FA0bb0f5b21053C874c"),
+  musdAvBtcmPool: getAddress("0xB018BED3b3376cE95ee34db170348FA16d18e29D"),
+  avBtcmAvMezomPool: getAddress("0xE639b9B1fb72C8ea2Fea246Ba0ad0ed7ddfB0E1C"),
 } as const;
 
 export type PairKey = "musd-avbtcm" | "mezo-musd" | "avbtcm-avmezom" | "mezo-btc";
