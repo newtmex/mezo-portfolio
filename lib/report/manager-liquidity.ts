@@ -48,7 +48,7 @@ export async function collectManagerRangeLiquidity(input: {
   token1: Address;
   tickSpacing: number;
   tick: number;
-}): Promise<{ liquidity: bigint; tokenIds: bigint[]; stakedIds: bigint[] }> {
+}): Promise<{ liquidity: bigint; stakedLiquidity: bigint; tokenIds: bigint[]; stakedIds: bigint[] }> {
   const tokenIds: bigint[] = [];
   const stakedIds: bigint[] = [];
 
@@ -73,6 +73,7 @@ export async function collectManagerRangeLiquidity(input: {
   };
 
   let liquidity = 0n;
+  let stakedLiquidity = 0n;
   const walletCount = await input.client.readContract({
     address: ADDRESSES.npm,
     abi: npmAbi,
@@ -99,10 +100,12 @@ export async function collectManagerRangeLiquidity(input: {
     args: [input.manager],
   });
   for (const tokenId of staked) {
-    liquidity += await consider(tokenId, true);
+    const amount = await consider(tokenId, true);
+    liquidity += amount;
+    stakedLiquidity += amount;
   }
 
-  return { liquidity, tokenIds, stakedIds };
+  return { liquidity, stakedLiquidity, tokenIds, stakedIds };
 }
 
 export async function buildClRangeDepthReport(input: {
@@ -136,6 +139,7 @@ export async function buildClRangeDepthReport(input: {
   ]);
 
   let managerLiquidity = 0n;
+  let managerStakedLiquidity = 0n;
   let managerTokenIds: bigint[] = [];
   let managerStakedIds: bigint[] = [];
   if (input.managerAddress) {
@@ -149,6 +153,7 @@ export async function buildClRangeDepthReport(input: {
       tick: input.pool.tick,
     });
     managerLiquidity = found.liquidity;
+    managerStakedLiquidity = found.stakedLiquidity;
     managerTokenIds = found.tokenIds;
     managerStakedIds = found.stakedIds;
   }
@@ -176,6 +181,7 @@ export async function buildClRangeDepthReport(input: {
   const withManager = scenario("with manager liquidity", input.pool.liquidity);
   const withoutManager = scenario("without manager liquidity", liquidityWithout);
   const managerShareBps = managerActiveShareBps(managerLiquidity, input.pool.liquidity);
+  const managerStakedShareBps = managerActiveShareBps(managerStakedLiquidity, input.pool.liquidity);
   const depthDiffToken0Bps = depthDiffRatioBps(
     BigInt(withManager.toLower.amount),
     BigInt(withoutManager.toLower.amount),
@@ -199,11 +205,13 @@ export async function buildClRangeDepthReport(input: {
     token1: { address: input.pool.token1, symbol: symbol1 },
     manager: input.managerAddress,
     managerInRangeLiquidity: managerLiquidity.toString(),
+    managerStakedInRangeLiquidity: managerStakedLiquidity.toString(),
     managerTokenIds: managerTokenIds.map((id) => id.toString()),
     managerStakedTokenIds: managerStakedIds.map((id) => id.toString()),
     activeLiquidity: input.pool.liquidity.toString(),
     activeLiquidityWithoutManager: liquidityWithout.toString(),
     managerActiveLiquidityShareBps: managerShareBps?.toString() ?? null,
+    managerStakedActiveLiquidityShareBps: managerStakedShareBps?.toString() ?? null,
     managerActiveLiquidityShare: formatBpsPercent(managerShareBps),
     priceMoveDepthDiffBps: {
       sellToken0ToLeaveLower: depthDiffToken0Bps?.toString() ?? null,

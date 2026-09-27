@@ -46,6 +46,8 @@ export function PoolDepthCard({ report }: { report: ClRangeDepthReport }) {
   const withScenario = report.scenarios[0];
   const withoutScenario = report.scenarios[1];
   const share = Number(report.managerActiveLiquidityShareBps ?? 0) / 100;
+  const stakedShare = Number(report.managerStakedActiveLiquidityShareBps ?? 0) / 100;
+  const unstakedShare = Math.max(0, share - stakedShare);
 
   return (
     <article className="flex h-full flex-col gap-4 rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.07] to-white/[0.02] p-4">
@@ -61,6 +63,10 @@ export function PoolDepthCard({ report }: { report: ClRangeDepthReport }) {
           <p className="font-mono text-xl font-semibold text-amber-100">
             {report.managerActiveLiquidityShare}
           </p>
+          <div className="mt-1 flex justify-end gap-2 text-[10px] font-medium">
+            <span className="text-emerald-300">Staked {stakedShare.toFixed(2)}%</span>
+            <span className="text-sky-300">Unstaked {unstakedShare.toFixed(2)}%</span>
+          </div>
         </div>
       </div>
 

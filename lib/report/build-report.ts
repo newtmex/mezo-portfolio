@@ -72,7 +72,7 @@ export async function buildManagerRangeDepthReport(input?: {
 
   const mezoPerDay = gaugePools.reduce((total, pool, index) => {
     const report = reports.find((candidate) => candidate.gauge === pool.gauge);
-    const activeShareBps = report?.managerActiveLiquidityShareBps;
+    const activeShareBps = report?.managerStakedActiveLiquidityShareBps;
     if (activeShareBps == null) return total;
     const accountRate = (aggregateEmissionRates[index] * BigInt(activeShareBps)) / 10_000n;
     return total + Number(formatUnits(accountRate, 18)) * 86_400;

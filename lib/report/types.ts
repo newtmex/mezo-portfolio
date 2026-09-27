@@ -19,11 +19,13 @@ export type ClRangeDepthReport = {
   token1: { address: string; symbol: string };
   manager: string | null;
   managerInRangeLiquidity: string;
+  managerStakedInRangeLiquidity: string;
   managerTokenIds: string[];
   managerStakedTokenIds: string[];
   activeLiquidity: string;
   activeLiquidityWithoutManager: string;
   managerActiveLiquidityShareBps: string | null;
+  managerStakedActiveLiquidityShareBps: string | null;
   managerActiveLiquidityShare: string;
   priceMoveDepthDiffBps: {
     sellToken0ToLeaveLower: string | null;
