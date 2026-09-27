@@ -3,6 +3,7 @@
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
 import { Activity, X } from "lucide-react";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { formatUsd } from "@/lib/utils";
 import { getAddress, isAddress } from "viem";
 
@@ -161,22 +162,30 @@ export function Dashboard() {
         refreshing={query.isFetching || poolQueries.some((pool) => pool.isFetching)}
         portfolioControls={data ? (
           <>
-            <details className="relative">
-              <summary className="cursor-pointer list-none rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-zinc-200 transition hover:bg-white/10">
+            <DropdownMenu.Root>
+              <DropdownMenu.Trigger asChild>
+                <button type="button" className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-zinc-200 transition hover:bg-white/10">
                 Tokens {formatUsd(data.holdings.tokenTotalMusd)}
-              </summary>
-              <div className="absolute right-0 top-full z-20 mt-2 w-[min(90vw,42rem)] rounded-2xl border border-white/10 bg-zinc-950 p-2 shadow-2xl">
+                </button>
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Portal>
+                <DropdownMenu.Content align="end" sideOffset={8} className="z-50 w-[min(90vw,42rem)] rounded-2xl border border-white/10 bg-zinc-950 p-2 shadow-2xl outline-none">
                 <TokenHoldingsTable rows={data.holdings.tokens} total={data.holdings.tokenTotalMusd} />
-              </div>
-            </details>
-            <details className="relative">
-              <summary className="cursor-pointer list-none rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-zinc-200 transition hover:bg-white/10">
+                </DropdownMenu.Content>
+              </DropdownMenu.Portal>
+            </DropdownMenu.Root>
+            <DropdownMenu.Root>
+              <DropdownMenu.Trigger asChild>
+                <button type="button" className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-zinc-200 transition hover:bg-white/10">
                 CL {formatUsd(data.holdings.clTotalMusd)}
-              </summary>
-              <div className="absolute right-0 top-full z-20 mt-2 w-[min(90vw,64rem)] rounded-2xl border border-white/10 bg-zinc-950 p-2 shadow-2xl">
+                </button>
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Portal>
+                <DropdownMenu.Content align="end" sideOffset={8} className="z-50 w-[min(90vw,64rem)] rounded-2xl border border-white/10 bg-zinc-950 p-2 shadow-2xl outline-none">
                 <ClPositionsTable rows={data.holdings.clPositions} total={data.holdings.clTotalMusd} />
-              </div>
-            </details>
+                </DropdownMenu.Content>
+              </DropdownMenu.Portal>
+            </DropdownMenu.Root>
           </>
         ) : null}
         onRefresh={() => {
