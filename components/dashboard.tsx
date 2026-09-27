@@ -2,7 +2,7 @@
 
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
-import { Activity, Bell, X } from "lucide-react";
+import { Activity, Bell, Settings, X } from "lucide-react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { formatUsd } from "@/lib/utils";
 import { getAddress, isAddress } from "viem";
@@ -30,7 +30,7 @@ async function fetchPool(key: string): Promise<ClRangeDepthReport> {
   return response.json();
 }
 
-function playUpdateSound() {
+function playUpdateSound(volume: number) {
   if (typeof window === "undefined") return;
   const audioContext = new AudioContext();
   const notes = [523.25, 659.25, 783.99, 987.77, 783.99, 987.77, 1318.51, 1567.98];
@@ -45,7 +45,7 @@ function playUpdateSound() {
     oscillator.type = index >= notes.length - 2 ? "triangle" : "sine";
     oscillator.frequency.setValueAtTime(frequency, noteStart);
     gain.gain.setValueAtTime(0.0001, noteStart);
-    gain.gain.exponentialRampToValueAtTime(0.075, noteStart + 0.025);
+    gain.gain.exponentialRampToValueAtTime(Math.max(volume, 0.0001), noteStart + 0.025);
     gain.gain.exponentialRampToValueAtTime(0.0001, noteEnd);
     oscillator.connect(gain);
     gain.connect(audioContext.destination);
@@ -58,7 +58,7 @@ function playUpdateSound() {
       harmony.type = "sine";
       harmony.frequency.setValueAtTime(frequency / 2, noteStart);
       harmonyGain.gain.setValueAtTime(0.0001, noteStart);
-      harmonyGain.gain.exponentialRampToValueAtTime(0.025, noteStart + 0.03);
+      harmonyGain.gain.exponentialRampToValueAtTime(Math.max(volume * 0.33, 0.0001), noteStart + 0.03);
       harmonyGain.gain.exponentialRampToValueAtTime(0.0001, noteEnd);
       harmony.connect(harmonyGain);
       harmonyGain.connect(audioContext.destination);
@@ -76,6 +76,18 @@ export function Dashboard() {
   const [events, setEvents] = useState<LiveEventItem[]>([]);
   const [activityOpen, setActivityOpen] = useState(false);
   const [alertsEnabled, setAlertsEnabled] = useState(false);
+  const [volume, setVolume] = useState(0.075);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  const updateVolume = (value: number) => {
+    setVolume(value);
+    window.localStorage.setItem("portfolio-alert-volume", String(value));
+  };
+
+  useEffect(() => {
+    const saved = Number(window.localStorage.getItem("portfolio-alert-volume"));
+    if (Number.isFinite(saved)) setVolume(Math.min(Math.max(saved, 0), 0.15));
+  }, []);
 
   const enableAlerts = async () => {
     if (typeof window === "undefined") return;
@@ -124,7 +136,7 @@ export function Dashboard() {
     const handle = startManagerEventWatchers(manager, {
         onEvent: (event) => {
           if (alertsEnabled) {
-            playUpdateSound();
+            if (volume > 0) playUpdateSound(volume);
             if ("Notification" in window && Notification.permission === "granted") {
               new Notification(`Portfolio update · ${event.kind}`, {
                 body: `${event.source}: ${event.summary}`,
@@ -141,7 +153,7 @@ export function Dashboard() {
       onRefreshNeeded,
     });
     return () => handle.stop();
-  }, [alertsEnabled, manager, onRefreshNeeded]);
+  }, [alertsEnabled, manager, onRefreshNeeded, volume]);
 
   if (query.isLoading && !query.data && poolQueries.every((pool) => pool.isLoading)) {
     return (
@@ -181,6 +193,34 @@ export function Dashboard() {
 
   return (
     <div className="space-y-6">
+      <div className="fixed right-4 top-4 z-30">
+        <button
+          type="button"
+          onClick={() => setSettingsOpen((open) => !open)}
+          className="rounded-lg border border-white/10 bg-zinc-950/90 p-2 text-zinc-300 shadow-xl backdrop-blur transition hover:bg-white/10 hover:text-zinc-100"
+          aria-label="Open alert settings"
+        >
+          <Settings className="h-3.5 w-3.5" />
+        </button>
+        {settingsOpen ? (
+          <div className="absolute right-0 top-full mt-2 w-56 rounded-xl border border-white/10 bg-zinc-950 p-3 shadow-2xl">
+            <div className="flex items-center justify-between text-xs text-zinc-300">
+              <label htmlFor="alert-volume">Alert volume</label>
+              <span>{volume === 0 ? "Muted" : `${Math.round((volume / 0.15) * 100)}%`}</span>
+            </div>
+            <input
+              id="alert-volume"
+              type="range"
+              min="0"
+              max="0.15"
+              step="0.005"
+              value={volume}
+              onChange={(event) => updateVolume(Number(event.target.value))}
+              className="mt-2 w-full accent-amber-300"
+            />
+          </div>
+        ) : null}
+      </div>
       <button
         type="button"
         onClick={() => void enableAlerts()}
