@@ -14,15 +14,18 @@ import { TokenHoldingsTable } from "@/components/token-holdings-table";
 import type { LiveEventItem, WsConnectionState } from "@/lib/events/types";
 import { startManagerEventWatchers } from "@/lib/events/watchers";
 import { PAIRS } from "@/lib/config";
-import { buildManagerRangeDepthReport, buildPoolRangeDepthReport } from "@/lib/report/build-report";
 import type { ClRangeDepthReport } from "@/lib/report/types";
 
 async function fetchRangeDepth() {
-  return buildManagerRangeDepthReport();
+  const response = await fetch("/api/range-depth", { cache: "no-store" });
+  if (!response.ok) throw new Error((await response.json()).error ?? "Failed to fetch range-depth report");
+  return response.json();
 }
 
 async function fetchPool(key: string): Promise<ClRangeDepthReport> {
-  return buildPoolRangeDepthReport(key as (typeof PAIRS)[number]["key"]);
+  const response = await fetch(`/api/range-depth?pool=${encodeURIComponent(key)}`, { cache: "no-store" });
+  if (!response.ok) throw new Error((await response.json()).error ?? `Failed to fetch ${key}`);
+  return response.json();
 }
 
 export function Dashboard() {
