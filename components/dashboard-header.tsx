@@ -33,11 +33,7 @@ export function DashboardHeader(props: {
         </h1>
         <p className="max-w-2xl text-sm text-zinc-400">
           Live report of portfolio tight-range liquidity share, price-move depth, wallet balances,
-          and CL positions — matching{" "}
-          <code className="rounded bg-white/5 px-1.5 py-0.5 text-zinc-200">
-            portfolio range-depth report
-          </code>
-          .
+          and CL positions.
         </p>
       </div>
 
