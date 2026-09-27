@@ -33,7 +33,7 @@ export function PortfolioSummary({ data }: { data: ManagerRangeDepthPayload }) {
         })();
 
   return (
-    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
       <Kpi
         label="Portfolio"
         value={formatUsd(data.holdings.portfolioTotalMusd)}
@@ -41,7 +41,12 @@ export function PortfolioSummary({ data }: { data: ManagerRangeDepthPayload }) {
       />
       <Kpi label="Token balances" value={formatUsd(data.holdings.tokenTotalMusd)} />
       <Kpi label="CL positions" value={formatUsd(data.holdings.clTotalMusd)} />
-      <Kpi label="Avg portfolio active %" value={avgShare} hint="Across three pools" />
+      <Kpi label="Avg portfolio active %" value={avgShare} hint="Across all pools" />
+      <Kpi
+        label="MEZO emissions / day"
+        value={data.emissions.mezoPerDay == null ? "n/a" : `${data.emissions.mezoPerDay.toFixed(2)} MEZO`}
+        hint={formatUsd(data.emissions.valueMusdPerDay) + " / day"}
+      />
     </section>
   );
 }

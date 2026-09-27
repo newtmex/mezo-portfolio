@@ -221,6 +221,13 @@ export const npmAbi = [
 export const gaugeAbi = [
   {
     type: "function",
+    name: "rewardRate",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
     name: "stakedValues",
     stateMutability: "view",
     inputs: [{ name: "depositor", type: "address" }],

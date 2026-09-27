@@ -88,4 +88,8 @@ export type ManagerRangeDepthPayload = {
   };
   summary: ManagerRangeDepthSummaryRow[];
   pools: ClRangeDepthReport[];
+  emissions: {
+    mezoPerDay: number | null;
+    valueMusdPerDay: number | null;
+  };
 };

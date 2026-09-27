@@ -1,6 +1,6 @@
-import { type Address, type PublicClient } from "viem";
+import { formatUnits, type Address, type PublicClient } from "viem";
 
-import { erc20Abi } from "../abis";
+import { erc20Abi, gaugeAbi } from "../abis";
 import { getHttpClient } from "../clients";
 import {
   getManagerAddress,
@@ -13,7 +13,7 @@ import {
   collectManagerPoolPositions,
   readManagerTokenHoldings,
 } from "./manager-liquidity";
-import { fetchMezoPriceMapMusd } from "./mezo-prices";
+import { fetchMezoPriceMapMusd, lookupPriceMusd } from "./mezo-prices";
 import { resolveMostLiquidClPool } from "./pools";
 import type { ClRangeDepthReport, ManagerRangeDepthPayload } from "./types";
 
@@ -37,6 +37,26 @@ export async function buildManagerRangeDepthReport(input?: {
       ),
     })),
   );
+
+  const rewardRates = await Promise.all(
+    pairSnapshots.map(async ({ pair }) => {
+      if (!pair.knownGauge) return 0n;
+      try {
+        return await client.readContract({
+          address: pair.knownGauge,
+          abi: gaugeAbi,
+          functionName: "rewardRate",
+        });
+      } catch {
+        return 0n;
+      }
+    }),
+  );
+  const mezoPerDay = rewardRates.reduce(
+    (total, rate) => total + Number(formatUnits(rate, 18)) * 86_400,
+    0,
+  );
+  const mezoPrice = lookupPriceMusd(prices, TRACKED_TOKENS[1].address, "MEZO");
 
   const reports = await Promise.all(
     pairSnapshots.map(({ pair, pool }) =>
@@ -119,6 +139,11 @@ export async function buildManagerRangeDepthReport(input?: {
     },
     summary,
     pools: reports,
+    emissions: {
+      mezoPerDay: Number.isFinite(mezoPerDay) ? mezoPerDay : null,
+      valueMusdPerDay:
+        mezoPrice != null && Number.isFinite(mezoPerDay) ? mezoPerDay * mezoPrice : null,
+    },
   };
 }
 
