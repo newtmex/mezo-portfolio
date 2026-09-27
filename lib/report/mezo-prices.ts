@@ -9,9 +9,31 @@ function parseNumber(value: unknown): number | null {
 /** Build symbol/address → mUSD price map from Mezo `/tokens` + `/pools`. */
 export async function fetchMezoPriceMapMusd(): Promise<Map<string, number>> {
   const prices = new Map<string, number>();
-  const [tokensRes, poolsRes] = await Promise.all([
+  const endpoints = [
     fetch(`${MEZO_API_BASE}/tokens`, { cache: "no-store" }),
     fetch(`${MEZO_API_BASE}/pools?filter=none`, { cache: "no-store" }),
+  ];
+  const [tokensRes, poolsRes] = await Promise.all(endpoints);
+
+  const logFailedResponse = async (endpoint: string, response: Response) => {
+    if (response.ok) return;
+    let body = "";
+    try {
+      body = await response.clone().text();
+    } catch {
+      body = "<unable to read response body>";
+    }
+    console.error("[mezo-prices] Mezo API request failed", {
+      endpoint,
+      status: response.status,
+      statusText: response.statusText,
+      body,
+    });
+  };
+
+  await Promise.all([
+    logFailedResponse(`${MEZO_API_BASE}/tokens`, tokensRes),
+    logFailedResponse(`${MEZO_API_BASE}/pools?filter=none`, poolsRes),
   ]);
 
   const remember = (address: unknown, symbol: unknown, price: unknown) => {

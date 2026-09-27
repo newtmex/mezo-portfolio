@@ -20,6 +20,10 @@ export async function GET(request: Request) {
     return NextResponse.json(await buildManagerRangeDepthReport());
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown range-depth error";
+    console.error("[api/range-depth] Report generation failed", {
+      message,
+      error,
+    });
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
