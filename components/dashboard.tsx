@@ -39,13 +39,11 @@ export function Dashboard() {
   const query = useQuery({
     queryKey: ["range-depth"],
     queryFn: fetchRangeDepth,
-    refetchInterval: wsState === "connected" ? 60_000 : 15_000,
   });
   const poolQueries = useQueries({
     queries: PAIRS.map((pair) => ({
       queryKey: ["pool-range-depth", pair.key],
       queryFn: () => fetchPool(pair.key),
-      refetchInterval: wsState === "connected" ? 60_000 : 15_000,
     })),
   });
 
@@ -61,6 +59,8 @@ export function Dashboard() {
     const pair = PAIRS.find((candidate) => candidate.label === source);
     if (pair) {
       void queryClient.invalidateQueries({ queryKey: ["pool-range-depth", pair.key] });
+      // Pool swaps change spot prices, so refresh portfolio valuations too.
+      void queryClient.invalidateQueries({ queryKey: ["range-depth"] });
       return;
     }
     void queryClient.invalidateQueries({ queryKey: ["range-depth"] });
