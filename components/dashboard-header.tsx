@@ -42,12 +42,12 @@ export function DashboardHeader(props: {
       </div>
 
       <div className="relative flex flex-col items-start gap-2 pt-10 sm:items-end sm:pt-10">
-        <div className="absolute right-0 top-0 flex items-center gap-2">
+        <div className="absolute right-0 top-0 flex flex-nowrap items-center gap-2 whitespace-nowrap">
           <a
             href={explorerAddressUrl(MEZO_EXPLORER, props.manager)}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1.5 font-mono text-sm text-zinc-200 hover:text-amber-200"
+            className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap font-mono text-sm text-zinc-200 hover:text-amber-200"
           >
             {shortenAddress(props.manager, 6)}
             <ExternalLink className="h-3.5 w-3.5" />
