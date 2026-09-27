@@ -2,7 +2,7 @@
 
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
-import { Activity, X } from "lucide-react";
+import { Activity, Bell, X } from "lucide-react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { formatUsd } from "@/lib/utils";
 import { getAddress, isAddress } from "viem";
@@ -30,11 +30,40 @@ async function fetchPool(key: string): Promise<ClRangeDepthReport> {
   return response.json();
 }
 
+function playUpdateSound() {
+  if (typeof window === "undefined") return;
+  const audioContext = new AudioContext();
+  const oscillator = audioContext.createOscillator();
+  const gain = audioContext.createGain();
+  oscillator.frequency.value = 880;
+  oscillator.type = "sine";
+  gain.gain.setValueAtTime(0.0001, audioContext.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.08, audioContext.currentTime + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.16);
+  oscillator.connect(gain);
+  gain.connect(audioContext.destination);
+  oscillator.start();
+  oscillator.stop(audioContext.currentTime + 0.16);
+  void oscillator.addEventListener("ended", () => void audioContext.close());
+}
+
 export function Dashboard() {
   const queryClient = useQueryClient();
   const [wsState, setWsState] = useState<WsConnectionState>("idle");
   const [events, setEvents] = useState<LiveEventItem[]>([]);
   const [activityOpen, setActivityOpen] = useState(false);
+  const [alertsEnabled, setAlertsEnabled] = useState(false);
+
+  const enableAlerts = async () => {
+    if (typeof window === "undefined") return;
+    if ("Notification" in window && Notification.permission === "default") {
+      await Notification.requestPermission();
+    }
+    const audioContext = new AudioContext();
+    await audioContext.resume();
+    await audioContext.close();
+    setAlertsEnabled(true);
+  };
 
   const query = useQuery({
     queryKey: ["range-depth"],
@@ -70,8 +99,17 @@ export function Dashboard() {
   useEffect(() => {
     if (!manager) return;
     const handle = startManagerEventWatchers(manager, {
-      onEvent: (event) => {
-        setEvents((prev) => {
+        onEvent: (event) => {
+          if (alertsEnabled) {
+            playUpdateSound();
+            if ("Notification" in window && Notification.permission === "granted") {
+              new Notification(`Portfolio update · ${event.kind}`, {
+                body: `${event.source}: ${event.summary}`,
+                tag: event.id,
+              });
+            }
+          }
+          setEvents((prev) => {
           if (prev.some((row) => row.id === event.id)) return prev;
           return [event, ...prev].slice(0, 50);
         });
@@ -80,7 +118,7 @@ export function Dashboard() {
       onRefreshNeeded,
     });
     return () => handle.stop();
-  }, [manager, onRefreshNeeded]);
+  }, [alertsEnabled, manager, onRefreshNeeded]);
 
   if (query.isLoading && !query.data && poolQueries.every((pool) => pool.isLoading)) {
     return (
@@ -120,6 +158,15 @@ export function Dashboard() {
 
   return (
     <div className="space-y-6">
+      <button
+        type="button"
+        onClick={() => void enableAlerts()}
+        className={`fixed right-28 top-4 z-30 inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium shadow-xl backdrop-blur transition ${alertsEnabled ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200" : "border-white/10 bg-zinc-950/90 text-zinc-100 hover:bg-white/10"}`}
+        aria-label={alertsEnabled ? "Portfolio alerts enabled" : "Enable portfolio alerts"}
+      >
+        <Bell className="h-3.5 w-3.5" />
+        {alertsEnabled ? "Alerts on" : "Enable alerts"}
+      </button>
       <button
         type="button"
         onClick={() => setActivityOpen(true)}
