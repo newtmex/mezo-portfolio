@@ -33,18 +33,27 @@ async function fetchPool(key: string): Promise<ClRangeDepthReport> {
 function playUpdateSound() {
   if (typeof window === "undefined") return;
   const audioContext = new AudioContext();
-  const oscillator = audioContext.createOscillator();
-  const gain = audioContext.createGain();
-  oscillator.frequency.value = 880;
-  oscillator.type = "sine";
-  gain.gain.setValueAtTime(0.0001, audioContext.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.08, audioContext.currentTime + 0.01);
-  gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.16);
-  oscillator.connect(gain);
-  gain.connect(audioContext.destination);
-  oscillator.start();
-  oscillator.stop(audioContext.currentTime + 0.16);
-  void oscillator.addEventListener("ended", () => void audioContext.close());
+  const notes = [659.25, 783.99, 987.77, 1318.51];
+  const noteLength = 0.18;
+  const start = audioContext.currentTime;
+
+  notes.forEach((frequency, index) => {
+    const oscillator = audioContext.createOscillator();
+    const gain = audioContext.createGain();
+    const noteStart = start + index * noteLength;
+    const noteEnd = noteStart + noteLength * 1.35;
+    oscillator.type = index === notes.length - 1 ? "triangle" : "sine";
+    oscillator.frequency.setValueAtTime(frequency, noteStart);
+    gain.gain.setValueAtTime(0.0001, noteStart);
+    gain.gain.exponentialRampToValueAtTime(0.075, noteStart + 0.025);
+    gain.gain.exponentialRampToValueAtTime(0.0001, noteEnd);
+    oscillator.connect(gain);
+    gain.connect(audioContext.destination);
+    oscillator.start(noteStart);
+    oscillator.stop(noteEnd);
+  });
+
+  window.setTimeout(() => void audioContext.close(), notes.length * noteLength * 1000 + 300);
 }
 
 export function Dashboard() {
