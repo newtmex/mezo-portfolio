@@ -76,7 +76,7 @@ export function Dashboard() {
   const [events, setEvents] = useState<LiveEventItem[]>([]);
   const [activityOpen, setActivityOpen] = useState(false);
   const [alertsEnabled, setAlertsEnabled] = useState(false);
-  const [volume, setVolume] = useState(0.075);
+  const [volume, setVolume] = useState(0.15);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const updateVolume = (value: number) => {
@@ -193,52 +193,54 @@ export function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="fixed right-4 top-4 z-30">
+      <div className="fixed right-4 top-4 z-30 flex items-start gap-2">
         <button
           type="button"
-          onClick={() => setSettingsOpen((open) => !open)}
-          className="rounded-lg border border-white/10 bg-zinc-950/90 p-2 text-zinc-300 shadow-xl backdrop-blur transition hover:bg-white/10 hover:text-zinc-100"
-          aria-label="Open alert settings"
+          onClick={() => void enableAlerts()}
+          className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium shadow-xl backdrop-blur transition ${alertsEnabled ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200" : "border-white/10 bg-zinc-950/90 text-zinc-100 hover:bg-white/10"}`}
+          aria-label={alertsEnabled ? "Portfolio alerts enabled" : "Enable portfolio alerts"}
         >
-          <Settings className="h-3.5 w-3.5" />
+          <Bell className="h-3.5 w-3.5" />
+          {alertsEnabled ? "Alerts on" : "Enable alerts"}
         </button>
-        {settingsOpen ? (
-          <div className="absolute right-0 top-full mt-2 w-56 rounded-xl border border-white/10 bg-zinc-950 p-3 shadow-2xl">
-            <div className="flex items-center justify-between text-xs text-zinc-300">
-              <label htmlFor="alert-volume">Alert volume</label>
-              <span>{volume === 0 ? "Muted" : `${Math.round((volume / 0.15) * 100)}%`}</span>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setSettingsOpen((open) => !open)}
+            className="rounded-lg border border-white/10 bg-zinc-950/90 p-2 text-zinc-300 shadow-xl backdrop-blur transition hover:bg-white/10 hover:text-zinc-100"
+            aria-label="Open alert settings"
+          >
+            <Settings className="h-3.5 w-3.5" />
+          </button>
+          {settingsOpen ? (
+            <div className="absolute right-0 top-full mt-2 w-56 rounded-xl border border-white/10 bg-zinc-950 p-3 shadow-2xl">
+              <div className="flex items-center justify-between text-xs text-zinc-300">
+                <label htmlFor="alert-volume">Alert volume</label>
+                <span>{volume === 0 ? "Muted" : `${Math.round((volume / 0.15) * 100)}%`}</span>
+              </div>
+              <input
+                id="alert-volume"
+                type="range"
+                min="0"
+                max="0.15"
+                step="0.005"
+                value={volume}
+                onChange={(event) => updateVolume(Number(event.target.value))}
+                className="mt-2 w-full accent-amber-300"
+              />
             </div>
-            <input
-              id="alert-volume"
-              type="range"
-              min="0"
-              max="0.15"
-              step="0.005"
-              value={volume}
-              onChange={(event) => updateVolume(Number(event.target.value))}
-              className="mt-2 w-full accent-amber-300"
-            />
-          </div>
-        ) : null}
+          ) : null}
+        </div>
+        <button
+          type="button"
+          onClick={() => setActivityOpen(true)}
+          className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-zinc-950/90 px-3 py-2 text-xs font-medium text-zinc-100 shadow-xl backdrop-blur transition hover:bg-white/10"
+          aria-label="Open live on-chain activity"
+        >
+          <Activity className="h-3.5 w-3.5 text-amber-300" />
+          Activity{events.length > 0 ? ` (${events.length})` : ""}
+        </button>
       </div>
-      <button
-        type="button"
-        onClick={() => void enableAlerts()}
-        className={`fixed right-28 top-4 z-30 inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium shadow-xl backdrop-blur transition ${alertsEnabled ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200" : "border-white/10 bg-zinc-950/90 text-zinc-100 hover:bg-white/10"}`}
-        aria-label={alertsEnabled ? "Portfolio alerts enabled" : "Enable portfolio alerts"}
-      >
-        <Bell className="h-3.5 w-3.5" />
-        {alertsEnabled ? "Alerts on" : "Enable alerts"}
-      </button>
-      <button
-        type="button"
-        onClick={() => setActivityOpen(true)}
-        className="fixed right-4 top-4 z-30 inline-flex items-center gap-2 rounded-lg border border-white/10 bg-zinc-950/90 px-3 py-2 text-xs font-medium text-zinc-100 shadow-xl backdrop-blur transition hover:bg-white/10"
-        aria-label="Open live on-chain activity"
-      >
-        <Activity className="h-3.5 w-3.5 text-amber-300" />
-        Activity{events.length > 0 ? ` (${events.length})` : ""}
-      </button>
 
       {activityOpen ? (
         <>
