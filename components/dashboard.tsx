@@ -2,11 +2,11 @@
 
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
+import { Activity, X } from "lucide-react";
 import { getAddress, isAddress } from "viem";
 
 import { ClPositionsTable } from "@/components/cl-positions-table";
 import { DashboardHeader } from "@/components/dashboard-header";
-import { LiquiditySummaryTable } from "@/components/liquidity-summary-table";
 import { LiveEventFeed } from "@/components/live-event-feed";
 import { PoolDepthCard } from "@/components/pool-depth-card";
 import { PortfolioSummary } from "@/components/portfolio-summary";
@@ -32,6 +32,7 @@ export function Dashboard() {
   const queryClient = useQueryClient();
   const [wsState, setWsState] = useState<WsConnectionState>("idle");
   const [events, setEvents] = useState<LiveEventItem[]>([]);
+  const [activityOpen, setActivityOpen] = useState(false);
 
   const query = useQuery({
     queryKey: ["range-depth"],
@@ -79,10 +80,6 @@ export function Dashboard() {
     return () => handle.stop();
   }, [manager, onRefreshNeeded]);
 
-  const reports = poolQueries
-    .map((pool) => pool.data)
-    .filter((report): report is ClRangeDepthReport => Boolean(report));
-
   if (query.isLoading && !query.data && poolQueries.every((pool) => pool.isLoading)) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
@@ -96,7 +93,7 @@ export function Dashboard() {
     );
   }
 
-  if (query.isError && !query.data && reports.length === 0) {
+  if (query.isError && !query.data && poolQueries.every((pool) => !pool.data)) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="max-w-lg rounded-2xl border border-rose-500/30 bg-rose-500/10 px-6 py-8 text-center">
@@ -121,6 +118,41 @@ export function Dashboard() {
 
   return (
     <div className="space-y-6">
+      <button
+        type="button"
+        onClick={() => setActivityOpen(true)}
+        className="fixed right-4 top-4 z-30 inline-flex items-center gap-2 rounded-lg border border-white/10 bg-zinc-950/90 px-3 py-2 text-xs font-medium text-zinc-100 shadow-xl backdrop-blur transition hover:bg-white/10"
+        aria-label="Open live on-chain activity"
+      >
+        <Activity className="h-3.5 w-3.5 text-amber-300" />
+        Activity{events.length > 0 ? ` (${events.length})` : ""}
+      </button>
+
+      {activityOpen ? (
+        <>
+          <button
+            type="button"
+            aria-label="Close live on-chain activity"
+            onClick={() => setActivityOpen(false)}
+            className="fixed inset-0 z-40 bg-black/50"
+          />
+          <aside className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-white/10 bg-zinc-950 p-4 shadow-2xl">
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-sm font-semibold text-zinc-100">Live activity</p>
+              <button
+                type="button"
+                onClick={() => setActivityOpen(false)}
+                className="rounded-lg p-1.5 text-zinc-400 transition hover:bg-white/10 hover:text-zinc-100"
+                aria-label="Close live on-chain activity"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <LiveEventFeed events={events} />
+          </aside>
+        </>
+      ) : null}
+
       <DashboardHeader
         manager={manager}
         fetchedAt={data?.fetchedAt}
@@ -141,7 +173,7 @@ export function Dashboard() {
         ))}
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[1.4fr_1fr]">
+      <section>
         <div className="space-y-4">
           <TokenHoldingsTable
             rows={data?.holdings.tokens ?? []}
@@ -151,9 +183,7 @@ export function Dashboard() {
             rows={data?.holdings.clPositions ?? []}
             total={data?.holdings.clTotalMusd ?? null}
           />
-        <LiquiditySummaryTable rows={data?.summary ?? reports.map((report) => ({ pair: report.pairLabel, managerActivePct: report.managerActiveLiquidityShare, managerActiveBps: report.managerActiveLiquidityShareBps, managerL: report.managerInRangeLiquidity, activeL: report.activeLiquidity, depthDiffToken0: report.priceMoveDepthDiff.sellToken0ToLeaveLower, depthDiffToken1: report.priceMoveDepthDiff.sellToken1ToLeaveUpper }))} />
         </div>
-        <LiveEventFeed events={events} />
       </section>
     </div>
   );
