@@ -1,6 +1,13 @@
 import { createPublicClient, defineChain, http, webSocket, type PublicClient } from "viem";
 
-import { MEZO_CHAIN_ID, MEZO_EXPLORER, MEZO_RPC_HTTP, MEZO_RPC_WSS } from "./config";
+import {
+  BASE_CHAIN_ID,
+  BASE_RPC_HTTP,
+  MEZO_CHAIN_ID,
+  MEZO_EXPLORER,
+  MEZO_RPC_HTTP,
+  MEZO_RPC_WSS,
+} from "./config";
 
 const MEZO_MULTICALL3 = "0xcA11bde05977b3631167028862bE2a173976CA11" as const;
 
@@ -24,7 +31,17 @@ export const mezoMainnet = defineChain({
   },
 });
 
+export const baseMainnet = defineChain({
+  id: BASE_CHAIN_ID,
+  name: "Base",
+  nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+  rpcUrls: {
+    default: { http: [BASE_RPC_HTTP] },
+  },
+});
+
 let httpClient: PublicClient | null = null;
+let baseHttpClient: PublicClient | null = null;
 
 export function getHttpClient(): PublicClient {
   if (!httpClient) {
@@ -34,6 +51,16 @@ export function getHttpClient(): PublicClient {
     });
   }
   return httpClient;
+}
+
+export function getBaseHttpClient(): PublicClient {
+  if (!baseHttpClient) {
+    baseHttpClient = createPublicClient({
+      chain: baseMainnet,
+      transport: http(BASE_RPC_HTTP, { timeout: 30_000 }),
+    });
+  }
+  return baseHttpClient;
 }
 
 export function createWsClient(): PublicClient {

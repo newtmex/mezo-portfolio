@@ -21,6 +21,13 @@ export const MEZO_RPC_WSS =
   process.env.NEXT_PUBLIC_MEZO_RPC_WSS?.trim() ||
   "wss://mezo-mainnet.boar.network";
 
+export const BASE_CHAIN_ID = 8453;
+
+export const BASE_RPC_HTTP =
+  process.env.BASE_RPC_HTTP?.trim() ||
+  process.env.NEXT_PUBLIC_BASE_RPC_HTTP?.trim() ||
+  "https://mainnet.base.org";
+
 export const ADDRESSES = {
   btc: getAddress("0x7b7C000000000000000000000000000000000000"),
   mezo: getAddress("0x7B7c000000000000000000000000000000000001"),
@@ -31,6 +38,13 @@ export const ADDRESSES = {
   npm: getAddress("0x509Bc221df2B83927c695FA0bb0f5b21053C874c"),
   musdAvBtcmPool: getAddress("0xB018BED3b3376cE95ee34db170348FA16d18e29D"),
   avBtcmAvMezomPool: getAddress("0xE639b9B1fb72C8ea2Fea246Ba0ad0ed7ddfB0E1C"),
+} as const;
+
+export const BASE_ADDRESSES = {
+  mezo: getAddress("0x8e4cbbcc33db6c0a18561fde1f6ba35906d4848b"),
+  musd: getAddress("0xdd468a1ddc392dcdbef6db6e34e89aa338f9f186"),
+  clFactory: getAddress("0xf8f2eB4940CFE7d13603DDDD87f123820Fc061Ef"),
+  pool: getAddress("0xEF458A3263d2a8C7f3ed9e949aE2F9B345D08b1F"),
 } as const;
 
 export type PairKey = "musd-avbtcm" | "mezo-musd" | "avbtcm-avmezom" | "mezo-btc";
@@ -88,9 +102,7 @@ export const TRACKED_TOKENS = [
 
 function readManagerAddress(): Address | null {
   const raw =
-    process.env.MANAGER_ADDRESS?.trim() ||
-    process.env.NEXT_PUBLIC_MANAGER_ADDRESS?.trim() ||
-    null;
+    process.env.MANAGER_ADDRESS?.trim() || process.env.NEXT_PUBLIC_MANAGER_ADDRESS?.trim() || null;
   if (!raw) return null;
   if (!isAddress(raw)) {
     throw new Error(`Invalid MANAGER_ADDRESS: ${raw}`);

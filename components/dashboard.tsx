@@ -8,6 +8,7 @@ import { formatUsd } from "@/lib/utils";
 import { getAddress, isAddress } from "viem";
 
 import { ClPositionsTable } from "@/components/cl-positions-table";
+import { BasePoolCard } from "@/components/base-pool-card";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { LiveEventFeed } from "@/components/live-event-feed";
 import { PoolDepthCard } from "@/components/pool-depth-card";
@@ -17,16 +18,26 @@ import type { LiveEventItem, WsConnectionState } from "@/lib/events/types";
 import { startManagerEventWatchers } from "@/lib/events/watchers";
 import { PAIRS } from "@/lib/config";
 import type { ClRangeDepthReport } from "@/lib/report/types";
+import type { BasePoolReport } from "@/lib/report/base-pool";
 
 async function fetchRangeDepth() {
   const response = await fetch("/api/range-depth", { cache: "no-store" });
-  if (!response.ok) throw new Error((await response.json()).error ?? "Failed to fetch range-depth report");
+  if (!response.ok)
+    throw new Error((await response.json()).error ?? "Failed to fetch range-depth report");
   return response.json();
 }
 
 async function fetchPool(key: string): Promise<ClRangeDepthReport> {
-  const response = await fetch(`/api/range-depth?pool=${encodeURIComponent(key)}`, { cache: "no-store" });
+  const response = await fetch(`/api/range-depth?pool=${encodeURIComponent(key)}`, {
+    cache: "no-store",
+  });
   if (!response.ok) throw new Error((await response.json()).error ?? `Failed to fetch ${key}`);
+  return response.json();
+}
+
+async function fetchBasePool(): Promise<BasePoolReport> {
+  const response = await fetch("/api/base-pool", { cache: "no-store" });
+  if (!response.ok) throw new Error((await response.json()).error ?? "Failed to fetch Base pool");
   return response.json();
 }
 
@@ -58,7 +69,10 @@ function playUpdateSound(volume: number) {
       harmony.type = "sine";
       harmony.frequency.setValueAtTime(frequency / 2, noteStart);
       harmonyGain.gain.setValueAtTime(0.0001, noteStart);
-      harmonyGain.gain.exponentialRampToValueAtTime(Math.max(volume * 0.33, 0.0001), noteStart + 0.03);
+      harmonyGain.gain.exponentialRampToValueAtTime(
+        Math.max(volume * 0.33, 0.0001),
+        noteStart + 0.03,
+      );
       harmonyGain.gain.exponentialRampToValueAtTime(0.0001, noteEnd);
       harmony.connect(harmonyGain);
       harmonyGain.connect(audioContext.destination);
@@ -110,41 +124,49 @@ export function Dashboard() {
       queryFn: () => fetchPool(pair.key),
     })),
   });
+  const basePoolQuery = useQuery({
+    queryKey: ["base-pool"],
+    queryFn: fetchBasePool,
+  });
 
   const queryManager = query.data?.manager;
   const fromEnv = process.env.NEXT_PUBLIC_MANAGER_ADDRESS?.trim();
-  const manager = fromEnv && isAddress(fromEnv)
-    ? getAddress(fromEnv)
-    : queryManager && isAddress(queryManager)
-      ? getAddress(queryManager)
-      : null;
+  const manager =
+    fromEnv && isAddress(fromEnv)
+      ? getAddress(fromEnv)
+      : queryManager && isAddress(queryManager)
+        ? getAddress(queryManager)
+        : null;
 
-  const onRefreshNeeded = useCallback((source?: string) => {
-    const pair = PAIRS.find((candidate) => candidate.label === source);
-    if (pair) {
-      void queryClient.invalidateQueries({ queryKey: ["pool-range-depth", pair.key] });
-      // Pool swaps change spot prices, so refresh portfolio valuations too.
+  const onRefreshNeeded = useCallback(
+    (source?: string) => {
+      const pair = PAIRS.find((candidate) => candidate.label === source);
+      if (pair) {
+        void queryClient.invalidateQueries({ queryKey: ["pool-range-depth", pair.key] });
+        // Pool swaps change spot prices, so refresh portfolio valuations too.
+        void queryClient.invalidateQueries({ queryKey: ["range-depth"] });
+        return;
+      }
       void queryClient.invalidateQueries({ queryKey: ["range-depth"] });
-      return;
-    }
-    void queryClient.invalidateQueries({ queryKey: ["range-depth"] });
-    void queryClient.invalidateQueries({ queryKey: ["pool-range-depth"] });
-  }, [queryClient]);
+      void queryClient.invalidateQueries({ queryKey: ["pool-range-depth"] });
+    },
+    [queryClient],
+  );
 
   useEffect(() => {
     if (!manager) return;
     const handle = startManagerEventWatchers(manager, {
-        onEvent: (event) => {
-          if (alertsEnabled) {
-            if (volume > 0) playUpdateSound(volume);
-            if ("Notification" in window && Notification.permission === "granted") {
-              new Notification(`Portfolio update · ${event.kind}`, {
-                body: `${event.source}: ${event.summary}`,
-                tag: event.id,
-              });
-            }
+      onEvent: (event) => {
+        if (alertsEnabled) {
+          if (volume > 0) playUpdateSound(volume);
+          if ("Notification" in window && Notification.permission === "granted") {
+            new Notification(`Portfolio update · ${event.kind}`, {
+              body: `${event.source}: ${event.summary}`,
+              tag: event.id,
+            });
           }
-          setEvents((prev) => {
+        }
+        setEvents((prev) => {
           if (prev.some((row) => row.id === event.id)) return prev;
           return [event, ...prev].slice(0, 50);
         });
@@ -271,50 +293,99 @@ export function Dashboard() {
         manager={manager}
         fetchedAt={data?.fetchedAt}
         wsState={wsState}
-        refreshing={query.isFetching || poolQueries.some((pool) => pool.isFetching)}
-        portfolioControls={data ? (
-          <>
-            <DropdownMenu.Root>
-              <DropdownMenu.Trigger asChild>
-                <button type="button" className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-zinc-200 transition hover:bg-white/10">
-                Tokens {formatUsd(data.holdings.tokenTotalMusd)}
-                </button>
-              </DropdownMenu.Trigger>
-              <DropdownMenu.Portal>
-                <DropdownMenu.Content align="end" sideOffset={8} className="z-50 w-[min(90vw,42rem)] rounded-2xl border border-white/10 bg-zinc-950 p-2 shadow-2xl outline-none">
-                <TokenHoldingsTable rows={data.holdings.tokens} total={data.holdings.tokenTotalMusd} />
-                </DropdownMenu.Content>
-              </DropdownMenu.Portal>
-            </DropdownMenu.Root>
-            <DropdownMenu.Root>
-              <DropdownMenu.Trigger asChild>
-                <button type="button" className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-zinc-200 transition hover:bg-white/10">
-                CL {formatUsd(data.holdings.clTotalMusd)}
-                </button>
-              </DropdownMenu.Trigger>
-              <DropdownMenu.Portal>
-                <DropdownMenu.Content align="end" sideOffset={8} className="z-50 w-[min(90vw,64rem)] rounded-2xl border border-white/10 bg-zinc-950 p-2 shadow-2xl outline-none">
-                <ClPositionsTable rows={data.holdings.clPositions} total={data.holdings.clTotalMusd} />
-                </DropdownMenu.Content>
-              </DropdownMenu.Portal>
-            </DropdownMenu.Root>
-          </>
-        ) : null}
+        refreshing={
+          query.isFetching ||
+          poolQueries.some((pool) => pool.isFetching) ||
+          basePoolQuery.isFetching
+        }
+        portfolioControls={
+          data ? (
+            <>
+              <DropdownMenu.Root>
+                <DropdownMenu.Trigger asChild>
+                  <button
+                    type="button"
+                    className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-zinc-200 transition hover:bg-white/10"
+                  >
+                    Tokens {formatUsd(data.holdings.tokenTotalMusd)}
+                  </button>
+                </DropdownMenu.Trigger>
+                <DropdownMenu.Portal>
+                  <DropdownMenu.Content
+                    align="end"
+                    sideOffset={8}
+                    className="z-50 w-[min(90vw,42rem)] rounded-2xl border border-white/10 bg-zinc-950 p-2 shadow-2xl outline-none"
+                  >
+                    <TokenHoldingsTable
+                      rows={data.holdings.tokens}
+                      total={data.holdings.tokenTotalMusd}
+                    />
+                  </DropdownMenu.Content>
+                </DropdownMenu.Portal>
+              </DropdownMenu.Root>
+              <DropdownMenu.Root>
+                <DropdownMenu.Trigger asChild>
+                  <button
+                    type="button"
+                    className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-zinc-200 transition hover:bg-white/10"
+                  >
+                    CL {formatUsd(data.holdings.clTotalMusd)}
+                  </button>
+                </DropdownMenu.Trigger>
+                <DropdownMenu.Portal>
+                  <DropdownMenu.Content
+                    align="end"
+                    sideOffset={8}
+                    className="z-50 w-[min(90vw,64rem)] rounded-2xl border border-white/10 bg-zinc-950 p-2 shadow-2xl outline-none"
+                  >
+                    <ClPositionsTable
+                      rows={data.holdings.clPositions}
+                      total={data.holdings.clTotalMusd}
+                    />
+                  </DropdownMenu.Content>
+                </DropdownMenu.Portal>
+              </DropdownMenu.Root>
+            </>
+          ) : null
+        }
         onRefresh={() => {
           void query.refetch();
           void queryClient.invalidateQueries({ queryKey: ["pool-range-depth"] });
+          void basePoolQuery.refetch();
         }}
       />
 
       {data ? <PortfolioSummary data={data} /> : null}
 
       <section className="grid gap-4 xl:grid-cols-3">
-        {PAIRS.map((pair, index) => (
-          poolQueries[index].data ? <PoolDepthCard key={pair.key} report={poolQueries[index].data} /> :
-            <div key={pair.key} className="min-h-64 rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-zinc-500">Loading {pair.label}…</div>
-        ))}
+        {PAIRS.map((pair, index) =>
+          poolQueries[index].data ? (
+            <PoolDepthCard key={pair.key} report={poolQueries[index].data} />
+          ) : (
+            <div
+              key={pair.key}
+              className="min-h-64 rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-zinc-500"
+            >
+              Loading {pair.label}…
+            </div>
+          ),
+        )}
       </section>
 
+      <section>
+        {basePoolQuery.data ? (
+          <BasePoolCard report={basePoolQuery.data} />
+        ) : basePoolQuery.isError ? (
+          <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-4 text-sm text-rose-200">
+            Base MUSD/MEZO tracking unavailable:{" "}
+            {basePoolQuery.error instanceof Error ? basePoolQuery.error.message : "Unknown error"}
+          </div>
+        ) : (
+          <div className="min-h-40 rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-zinc-500">
+            Loading Base MUSD/MEZO tracking…
+          </div>
+        )}
+      </section>
     </div>
   );
 }
