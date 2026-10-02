@@ -23,10 +23,24 @@ export const MEZO_RPC_WSS =
 
 export const BASE_CHAIN_ID = 8453;
 
+const DEFAULT_BASE_RPC_URLS = [
+  "https://base-rpc.publicnode.com",
+  "https://base.llamarpc.com",
+  "https://mainnet.base.org",
+] as const;
+
 export const BASE_RPC_HTTP =
   process.env.BASE_RPC_HTTP?.trim() ||
   process.env.NEXT_PUBLIC_BASE_RPC_HTTP?.trim() ||
-  "https://mainnet.base.org";
+  DEFAULT_BASE_RPC_URLS[0];
+
+export const BASE_RPC_HTTP_FALLBACKS = [
+  BASE_RPC_HTTP,
+  ...(process.env.BASE_RPC_HTTP_FALLBACKS?.split(",") ?? []),
+  ...DEFAULT_BASE_RPC_URLS,
+]
+  .map((url) => url.trim())
+  .filter((url, index, urls) => Boolean(url) && urls.indexOf(url) === index);
 
 export const ADDRESSES = {
   btc: getAddress("0x7b7C000000000000000000000000000000000000"),

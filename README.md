@@ -44,13 +44,14 @@ Open [http://127.0.0.1:3001](http://127.0.0.1:3001).
 | `NEXT_PUBLIC_MANAGER_ADDRESS`                 | Client-side wallet address used for event filters |
 | `MEZO_RPC_HTTP` / `NEXT_PUBLIC_MEZO_RPC_HTTP` | Mezo HTTPS JSON-RPC endpoint                      |
 | `MEZO_RPC_WSS` / `NEXT_PUBLIC_MEZO_RPC_WSS`   | Mezo WebSocket endpoint for live events           |
-| `BASE_RPC_HTTP` / `NEXT_PUBLIC_BASE_RPC_HTTP` | Base HTTPS JSON-RPC endpoint for Aerodrome data   |
+| `BASE_RPC_HTTP` / `NEXT_PUBLIC_BASE_RPC_HTTP` | Primary Base HTTPS JSON-RPC endpoint              |
+| `BASE_RPC_HTTP_FALLBACKS`                     | Comma-separated Base RPC fallback endpoints       |
 | `MEZO_POOLS_API_BASE_URL`                     | Optional Mezo pools API base URL override         |
 | `MEZO_API_BASE_URL`                           | Optional Mezo API base URL override               |
 | `NEXT_PUBLIC_MEZO_API_BASE_URL`               | Optional browser-visible API base URL override    |
 | `NEXT_PUBLIC_MEZO_EXPLORER`                   | Optional Mezo explorer URL override               |
 
-The default API base is `https://api.mezo.org`; the default RPC endpoints use `mezo-mainnet.boar.network` and `https://mainnet.base.org`. No private keys are used.
+The default API base is `https://api.mezo.org`; Base reads use PublicNode, LlamaRPC, and the official public RPC as fallbacks. For production, set `BASE_RPC_HTTP` to a dedicated provider URL and keep optional fallbacks in `BASE_RPC_HTTP_FALLBACKS`. No private keys are used.
 
 ## Commands
 

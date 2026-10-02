@@ -22,48 +22,61 @@ export type BasePoolReport = {
   balances: Array<{ symbol: string; amount: string }>;
 };
 
-async function readTokenMetadata(
-  client: PublicClient,
-  address: Address,
-  pool: Address,
-): Promise<{ address: Address; symbol: string; decimals: number; balance: bigint }> {
-  const [symbol, decimals, balance] = await Promise.all([
-    client.readContract({ address, abi: erc20Abi, functionName: "symbol" }),
-    client.readContract({ address, abi: erc20Abi, functionName: "decimals" }),
-    client.readContract({ address, abi: erc20Abi, functionName: "balanceOf", args: [pool] }),
-  ]);
-  return {
-    address: getAddress(address),
-    symbol,
-    decimals: Number(decimals),
-    balance: BigInt(balance),
-  };
-}
-
 export async function buildBasePoolReport(input?: {
   client?: PublicClient;
 }): Promise<BasePoolReport> {
   const client = input?.client ?? getBaseHttpClient();
-  const resolvedPool = getAddress(
-    await client.readContract({
-      address: BASE_ADDRESSES.clFactory,
-      abi: clFactoryAbi,
-      functionName: "getPool",
-      args: [BASE_ADDRESSES.mezo, BASE_ADDRESSES.musd, BASE_TICK_SPACING],
-    }),
-  );
+  const [
+    factoryPool,
+    token0,
+    token1,
+    fee,
+    tickSpacing,
+    slot0,
+    liquidity,
+    symbol0,
+    decimals0,
+    balance0,
+    symbol1,
+    decimals1,
+    balance1,
+  ] = await client.multicall({
+    allowFailure: false,
+    contracts: [
+      {
+        address: BASE_ADDRESSES.clFactory,
+        abi: clFactoryAbi,
+        functionName: "getPool",
+        args: [BASE_ADDRESSES.mezo, BASE_ADDRESSES.musd, BASE_TICK_SPACING],
+      },
+      { address: BASE_ADDRESSES.pool, abi: clPoolAbi, functionName: "token0" },
+      { address: BASE_ADDRESSES.pool, abi: clPoolAbi, functionName: "token1" },
+      { address: BASE_ADDRESSES.pool, abi: clPoolAbi, functionName: "fee" },
+      { address: BASE_ADDRESSES.pool, abi: clPoolAbi, functionName: "tickSpacing" },
+      { address: BASE_ADDRESSES.pool, abi: clPoolAbi, functionName: "slot0" },
+      { address: BASE_ADDRESSES.pool, abi: clPoolAbi, functionName: "liquidity" },
+      { address: BASE_ADDRESSES.mezo, abi: erc20Abi, functionName: "symbol" },
+      { address: BASE_ADDRESSES.mezo, abi: erc20Abi, functionName: "decimals" },
+      {
+        address: BASE_ADDRESSES.mezo,
+        abi: erc20Abi,
+        functionName: "balanceOf",
+        args: [BASE_ADDRESSES.pool],
+      },
+      { address: BASE_ADDRESSES.musd, abi: erc20Abi, functionName: "symbol" },
+      { address: BASE_ADDRESSES.musd, abi: erc20Abi, functionName: "decimals" },
+      {
+        address: BASE_ADDRESSES.musd,
+        abi: erc20Abi,
+        functionName: "balanceOf",
+        args: [BASE_ADDRESSES.pool],
+      },
+    ],
+  });
+  const resolvedPool = getAddress(factoryPool);
   if (resolvedPool !== BASE_ADDRESSES.pool) {
     throw new Error(`Unexpected Base MUSD/MEZO pool: ${resolvedPool}`);
   }
-
-  const [token0, token1, fee, tickSpacing, slot0, liquidity] = await Promise.all([
-    client.readContract({ address: resolvedPool, abi: clPoolAbi, functionName: "token0" }),
-    client.readContract({ address: resolvedPool, abi: clPoolAbi, functionName: "token1" }),
-    client.readContract({ address: resolvedPool, abi: clPoolAbi, functionName: "fee" }),
-    client.readContract({ address: resolvedPool, abi: clPoolAbi, functionName: "tickSpacing" }),
-    client.readContract({ address: resolvedPool, abi: clPoolAbi, functionName: "slot0" }),
-    client.readContract({ address: resolvedPool, abi: clPoolAbi, functionName: "liquidity" }),
-  ]);
   const normalizedToken0 = getAddress(token0);
   const normalizedToken1 = getAddress(token1);
   if (normalizedToken0 !== BASE_ADDRESSES.mezo || normalizedToken1 !== BASE_ADDRESSES.musd) {
@@ -76,10 +89,18 @@ export async function buildBasePoolReport(input?: {
     throw new Error("Base MUSD/MEZO pool is not initialized.");
   }
 
-  const [metadata0, metadata1] = await Promise.all([
-    readTokenMetadata(client, normalizedToken0, resolvedPool),
-    readTokenMetadata(client, normalizedToken1, resolvedPool),
-  ]);
+  const metadata0 = {
+    address: normalizedToken0,
+    symbol: symbol0,
+    decimals: Number(decimals0),
+    balance: BigInt(balance0),
+  };
+  const metadata1 = {
+    address: normalizedToken1,
+    symbol: symbol1,
+    decimals: Number(decimals1),
+    balance: BigInt(balance1),
+  };
   const tick = Number(slot0[1]);
 
   return {
