@@ -1,9 +1,10 @@
 import { formatUnits, getAddress, type Address, type PublicClient } from "viem";
 
-import { clFactoryAbi, clPoolAbi, erc20Abi } from "../abis";
-import { BASE_ADDRESSES } from "../config";
+import { baseGaugeAbi, baseVoterAbi, clFactoryAbi, clPoolAbi, erc20Abi, npmAbi } from "../abis";
+import { BASE_ADDRESSES, getManagerAddressOrNull } from "../config";
 import { getBaseHttpClient } from "../clients";
 import { tightestRange } from "../math/tick-math";
+import { zeroAddress } from "viem";
 
 const BASE_TICK_SPACING = 200;
 
@@ -12,6 +13,8 @@ export type BasePoolReport = {
   pairLabel: "MUSD/MEZO";
   pool: Address;
   factory: Address;
+  gauge: Address | null;
+  manager: Address | null;
   token0: { address: Address; symbol: string; decimals: number };
   token1: { address: Address; symbol: string; decimals: number };
   tickSpacing: number;
@@ -19,6 +22,8 @@ export type BasePoolReport = {
   tick: number;
   range: { tickLower: number; tickUpper: number };
   activeLiquidity: string;
+  managerStakedLiquidity: string;
+  managerStakedTokenIds: string[];
   balances: Array<{ symbol: string; amount: string }>;
 };
 
@@ -40,6 +45,7 @@ export async function buildBasePoolReport(input?: {
     symbol1,
     decimals1,
     balance1,
+    gaugeResult,
   ] = await client.multicall({
     allowFailure: false,
     contracts: [
@@ -71,6 +77,12 @@ export async function buildBasePoolReport(input?: {
         functionName: "balanceOf",
         args: [BASE_ADDRESSES.pool],
       },
+      {
+        address: BASE_ADDRESSES.voter,
+        abi: baseVoterAbi,
+        functionName: "gauges",
+        args: [BASE_ADDRESSES.pool],
+      },
     ],
   });
   const resolvedPool = getAddress(factoryPool);
@@ -87,6 +99,55 @@ export async function buildBasePoolReport(input?: {
   }
   if (BigInt(slot0[0]) === 0n) {
     throw new Error("Base MUSD/MEZO pool is not initialized.");
+  }
+
+  const gauge = getAddress(gaugeResult);
+  const manager = getManagerAddressOrNull();
+  let managerStakedTokenIds: string[] = [];
+  let managerStakedLiquidity = 0n;
+  if (manager && gauge !== zeroAddress) {
+    const [stakedLength] = await client.multicall({
+      allowFailure: false,
+      contracts: [
+        {
+          address: gauge,
+          abi: baseGaugeAbi,
+          functionName: "stakedLength",
+          args: [manager],
+        },
+      ],
+    });
+    const length = Number(stakedLength);
+    if (length > 0) {
+      const stakedIds = await client.multicall({
+        allowFailure: false,
+        contracts: Array.from({ length }, (_, index) => ({
+          address: gauge,
+          abi: baseGaugeAbi,
+          functionName: "stakedByIndex" as const,
+          args: [manager, BigInt(index)] as const,
+        })),
+      });
+      const positions = await client.multicall({
+        allowFailure: false,
+        contracts: stakedIds.map((tokenId) => ({
+          address: BASE_ADDRESSES.npm,
+          abi: npmAbi,
+          functionName: "positions" as const,
+          args: [BigInt(tokenId)] as const,
+        })),
+      });
+      managerStakedTokenIds = stakedIds.map((tokenId) => BigInt(tokenId).toString());
+      for (const position of positions) {
+        if (
+          getAddress(position[2]) === BASE_ADDRESSES.mezo &&
+          getAddress(position[3]) === BASE_ADDRESSES.musd &&
+          Number(position[4]) === BASE_TICK_SPACING
+        ) {
+          managerStakedLiquidity += BigInt(position[7]);
+        }
+      }
+    }
   }
 
   const metadata0 = {
@@ -108,6 +169,8 @@ export async function buildBasePoolReport(input?: {
     pairLabel: "MUSD/MEZO",
     pool: resolvedPool,
     factory: BASE_ADDRESSES.clFactory,
+    gauge: gauge === zeroAddress ? null : gauge,
+    manager,
     token0: {
       address: metadata0.address,
       symbol: metadata0.symbol,
@@ -123,6 +186,8 @@ export async function buildBasePoolReport(input?: {
     tick,
     range: tightestRange(tick, Number(tickSpacing)),
     activeLiquidity: BigInt(liquidity).toString(),
+    managerStakedLiquidity: managerStakedLiquidity.toString(),
+    managerStakedTokenIds,
     balances: [
       { symbol: metadata0.symbol, amount: formatUnits(metadata0.balance, metadata0.decimals) },
       { symbol: metadata1.symbol, amount: formatUnits(metadata1.balance, metadata1.decimals) },

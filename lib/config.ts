@@ -59,6 +59,8 @@ export const BASE_ADDRESSES = {
   musd: getAddress("0xdd468a1ddc392dcdbef6db6e34e89aa338f9f186"),
   clFactory: getAddress("0xf8f2eB4940CFE7d13603DDDD87f123820Fc061Ef"),
   pool: getAddress("0xEF458A3263d2a8C7f3ed9e949aE2F9B345D08b1F"),
+  voter: getAddress("0x16613524e02ad97eDfeF371bC883F2F5d6C480A5"),
+  npm: getAddress("0xe1f8cd9AC4e4A65F54f38a5CdAfCA44f6dD68b53"),
 } as const;
 
 export type PairKey = "musd-avbtcm" | "mezo-musd" | "avbtcm-avmezom" | "mezo-btc";

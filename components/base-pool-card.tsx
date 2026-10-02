@@ -33,6 +33,12 @@ export function BasePoolCard({ report }: { report: BasePoolReport }) {
           <p className="font-mono text-zinc-200">{formatAmount(report.activeLiquidity, 4)}</p>
         </div>
         <div>
+          <p className="text-zinc-500">Portfolio staked L</p>
+          <p className="font-mono text-zinc-200">
+            {formatAmount(report.managerStakedLiquidity, 4)}
+          </p>
+        </div>
+        <div>
           <p className="text-zinc-500">Fee / spacing</p>
           <p className="font-mono text-zinc-200">
             {report.fee} / {report.tickSpacing}
@@ -53,9 +59,16 @@ export function BasePoolCard({ report }: { report: BasePoolReport }) {
         ))}
       </div>
 
-      <p className="mt-auto text-[11px] text-zinc-500">
-        Active-liquidity tracker only · Base position is currently unstaked.
-      </p>
+      {report.managerStakedTokenIds.length > 0 ? (
+        <p className="mt-auto text-[11px] text-emerald-300/80">
+          Staked position{report.managerStakedTokenIds.length === 1 ? "" : "s"}:{" "}
+          {report.managerStakedTokenIds.map((id) => `#${id}`).join(", ")}
+        </p>
+      ) : (
+        <p className="mt-auto text-[11px] text-zinc-500">
+          No staked Base positions found for the configured manager.
+        </p>
+      )}
     </article>
   );
 }

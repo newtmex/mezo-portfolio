@@ -287,3 +287,33 @@ export const gaugeAbi = [
     ],
   },
 ] as const;
+
+export const baseVoterAbi = [
+  {
+    type: "function",
+    name: "gauges",
+    stateMutability: "view",
+    inputs: [{ name: "pool", type: "address" }],
+    outputs: [{ name: "", type: "address" }],
+  },
+] as const;
+
+export const baseGaugeAbi = [
+  {
+    type: "function",
+    name: "stakedLength",
+    stateMutability: "view",
+    inputs: [{ name: "depositor", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "stakedByIndex",
+    stateMutability: "view",
+    inputs: [
+      { name: "depositor", type: "address" },
+      { name: "index", type: "uint256" },
+    ],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+] as const;
