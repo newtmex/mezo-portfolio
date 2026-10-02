@@ -90,6 +90,13 @@ export const clPoolAbi = [
   },
   {
     type: "function",
+    name: "stakedLiquidity",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint128" }],
+  },
+  {
+    type: "function",
     name: "gauge",
     stateMutability: "view",
     inputs: [],

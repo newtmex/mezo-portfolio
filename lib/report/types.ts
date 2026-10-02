@@ -11,6 +11,7 @@ export type ClRangeDepthReport = {
   gauge: string;
   tickSpacing: number;
   fee: string;
+  activeLiquidityApr: number | null;
   tick: number;
   range: { tickLower: number; tickUpper: number };
   sqrtPriceX96: string;

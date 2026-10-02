@@ -1,9 +1,4 @@
-import {
-  getAddress,
-  type Address,
-  type PublicClient,
-  zeroAddress,
-} from "viem";
+import { getAddress, type Address, type PublicClient, zeroAddress } from "viem";
 
 import { clFactoryAbi, clPoolAbi } from "../abis";
 import { ADDRESSES } from "../config";
@@ -17,6 +12,7 @@ export type ClPoolSnapshot = {
   sqrtPriceX96: bigint;
   tick: number;
   liquidity: bigint;
+  stakedLiquidity: bigint;
   gauge: Address;
 };
 
@@ -25,17 +21,19 @@ async function readPoolSnapshot(
   address: Address,
   tickSpacingHint?: number,
 ): Promise<ClPoolSnapshot> {
-  const [token0, token1, fee, slot0, liquidity, gauge, tickSpacing] = await Promise.all([
-    client.readContract({ address, abi: clPoolAbi, functionName: "token0" }),
-    client.readContract({ address, abi: clPoolAbi, functionName: "token1" }),
-    client.readContract({ address, abi: clPoolAbi, functionName: "fee" }),
-    client.readContract({ address, abi: clPoolAbi, functionName: "slot0" }),
-    client.readContract({ address, abi: clPoolAbi, functionName: "liquidity" }),
-    client.readContract({ address, abi: clPoolAbi, functionName: "gauge" }),
-    tickSpacingHint != null
-      ? Promise.resolve(tickSpacingHint)
-      : client.readContract({ address, abi: clPoolAbi, functionName: "tickSpacing" }),
-  ]);
+  const [token0, token1, fee, slot0, liquidity, stakedLiquidity, gauge, tickSpacing] =
+    await Promise.all([
+      client.readContract({ address, abi: clPoolAbi, functionName: "token0" }),
+      client.readContract({ address, abi: clPoolAbi, functionName: "token1" }),
+      client.readContract({ address, abi: clPoolAbi, functionName: "fee" }),
+      client.readContract({ address, abi: clPoolAbi, functionName: "slot0" }),
+      client.readContract({ address, abi: clPoolAbi, functionName: "liquidity" }),
+      client.readContract({ address, abi: clPoolAbi, functionName: "stakedLiquidity" }),
+      client.readContract({ address, abi: clPoolAbi, functionName: "gauge" }),
+      tickSpacingHint != null
+        ? Promise.resolve(tickSpacingHint)
+        : client.readContract({ address, abi: clPoolAbi, functionName: "tickSpacing" }),
+    ]);
 
   return {
     address: getAddress(address),
@@ -46,6 +44,7 @@ async function readPoolSnapshot(
     sqrtPriceX96: BigInt(slot0[0]),
     tick: Number(slot0[1]),
     liquidity: BigInt(liquidity),
+    stakedLiquidity: BigInt(stakedLiquidity),
     gauge: getAddress(gauge),
   };
 }

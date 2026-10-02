@@ -48,7 +48,12 @@ export async function collectManagerRangeLiquidity(input: {
   token1: Address;
   tickSpacing: number;
   tick: number;
-}): Promise<{ liquidity: bigint; stakedLiquidity: bigint; tokenIds: bigint[]; stakedIds: bigint[] }> {
+}): Promise<{
+  liquidity: bigint;
+  stakedLiquidity: bigint;
+  tokenIds: bigint[];
+  stakedIds: bigint[];
+}> {
   const tokenIds: bigint[] = [];
   const stakedIds: bigint[] = [];
 
@@ -197,6 +202,7 @@ export async function buildClRangeDepthReport(input: {
     gauge: input.pool.gauge,
     tickSpacing: input.pool.tickSpacing,
     fee: input.pool.fee.toString(),
+    activeLiquidityApr: null,
     tick: input.pool.tick,
     range,
     sqrtPriceX96: input.pool.sqrtPriceX96.toString(),
@@ -324,12 +330,7 @@ export async function collectManagerPoolPositions(input: {
 
     const tickLower = Number(position[5]);
     const tickUpper = Number(position[6]);
-    const amounts = amountsForLiquidity(
-      input.pool.sqrtPriceX96,
-      tickLower,
-      tickUpper,
-      liquidity,
-    );
+    const amounts = amountsForLiquidity(input.pool.sqrtPriceX96, tickLower, tickUpper, liquidity);
     const value0 = valueRawAmountMusd(amounts.amount0, input.decimals0, price0);
     const value1 = valueRawAmountMusd(amounts.amount1, input.decimals1, price1);
     const valueMusd = value0 == null && value1 == null ? null : (value0 ?? 0) + (value1 ?? 0);

@@ -2,11 +2,12 @@
 
 Standalone Next.js dashboard for monitoring a Mezo mainnet portfolio across concentrated-liquidity pools.
 
-It displays portfolio totals, token balances, CL positions, pool range depth, active-liquidity share, price-move depth, and recent on-chain activity.
+It displays portfolio totals, token balances, CL positions, pool range depth, active-liquidity share, per-pool active-liquidity APR, price-move depth, and recent on-chain activity.
 
 ## Behavior
 
 - Covers `MUSD/avBTCm`, `MEZO/MUSD`, `MEZO/BTC`, and `avBTCm/avMEZOm`.
+- Calculates each pool's active-liquidity APR from live MEZO gauge rewards divided by estimated staked active-liquidity TVL, using current token prices.
 - Shows token balances and CL positions in portfolio dropdowns beside the wallet address.
 - Keeps live activity hidden by default in a foldable right-side panel.
 - Does not poll automatically. Data refreshes after watched on-chain events, including swaps, liquidity changes, token transfers, NFT transfers, and gauge deposits/withdrawals.
@@ -36,16 +37,16 @@ Open [http://127.0.0.1:3001](http://127.0.0.1:3001).
 
 ## Environment variables
 
-| Variable | Purpose |
-|---|---|
-| `MANAGER_ADDRESS` | Server-side portfolio wallet address |
-| `NEXT_PUBLIC_MANAGER_ADDRESS` | Client-side wallet address used for event filters |
-| `MEZO_RPC_HTTP` / `NEXT_PUBLIC_MEZO_RPC_HTTP` | Mezo HTTPS JSON-RPC endpoint |
-| `MEZO_RPC_WSS` / `NEXT_PUBLIC_MEZO_RPC_WSS` | Mezo WebSocket endpoint for live events |
-| `MEZO_POOLS_API_BASE_URL` | Optional Mezo pools API base URL override |
-| `MEZO_API_BASE_URL` | Optional Mezo API base URL override |
-| `NEXT_PUBLIC_MEZO_API_BASE_URL` | Optional browser-visible API base URL override |
-| `NEXT_PUBLIC_MEZO_EXPLORER` | Optional Mezo explorer URL override |
+| Variable                                      | Purpose                                           |
+| --------------------------------------------- | ------------------------------------------------- |
+| `MANAGER_ADDRESS`                             | Server-side portfolio wallet address              |
+| `NEXT_PUBLIC_MANAGER_ADDRESS`                 | Client-side wallet address used for event filters |
+| `MEZO_RPC_HTTP` / `NEXT_PUBLIC_MEZO_RPC_HTTP` | Mezo HTTPS JSON-RPC endpoint                      |
+| `MEZO_RPC_WSS` / `NEXT_PUBLIC_MEZO_RPC_WSS`   | Mezo WebSocket endpoint for live events           |
+| `MEZO_POOLS_API_BASE_URL`                     | Optional Mezo pools API base URL override         |
+| `MEZO_API_BASE_URL`                           | Optional Mezo API base URL override               |
+| `NEXT_PUBLIC_MEZO_API_BASE_URL`               | Optional browser-visible API base URL override    |
+| `NEXT_PUBLIC_MEZO_EXPLORER`                   | Optional Mezo explorer URL override               |
 
 The default API base is `https://api.mezo.org`; the default RPC endpoints use `mezo-mainnet.boar.network`. No private keys are used.
 

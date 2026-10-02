@@ -12,6 +12,11 @@ function formatLeaveAmount(value: string): string {
   return `${formatted}${match[2]}`;
 }
 
+function formatApr(value: number | null): string {
+  if (value == null || !Number.isFinite(value)) return "n/a";
+  return `${value.toFixed(2)}%`;
+}
+
 function DepthRow({
   label,
   side0,
@@ -57,6 +62,14 @@ export function PoolDepthCard({ report }: { report: ClRangeDepthReport }) {
           <p className="mt-1 font-mono text-[11px] text-zinc-500">
             {shortenAddress(report.pool, 5)} · spacing {report.tickSpacing} · fee {report.fee}
           </p>
+          <div className="mt-3 inline-flex items-center gap-2 rounded-lg border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1.5">
+            <span className="text-[10px] uppercase tracking-wide text-emerald-200/80">
+              Active liquidity APR
+            </span>
+            <span className="font-mono text-sm font-semibold text-emerald-100">
+              {formatApr(report.activeLiquidityApr)}
+            </span>
+          </div>
         </div>
         <div className="rounded-xl border border-amber-400/20 bg-amber-400/10 px-3 py-2 text-right">
           <p className="text-[10px] uppercase tracking-wide text-amber-200/80">Portfolio active</p>
@@ -138,10 +151,7 @@ export function PoolDepthCard({ report }: { report: ClRangeDepthReport }) {
         <p className="text-[11px] text-zinc-500">
           NFTs:{" "}
           {report.managerTokenIds
-            .map(
-              (id) =>
-                `#${id}${report.managerStakedTokenIds.includes(id) ? " (staked)" : ""}`,
-            )
+            .map((id) => `#${id}${report.managerStakedTokenIds.includes(id) ? " (staked)" : ""}`)
             .join(", ")}
         </p>
       ) : (
