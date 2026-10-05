@@ -3,7 +3,12 @@ import { formatUnits, getAddress, type Address, type PublicClient } from "viem";
 import { baseGaugeAbi, baseVoterAbi, clFactoryAbi, clPoolAbi, erc20Abi, npmAbi } from "../abis";
 import { BASE_ADDRESSES, getManagerAddressOrNull } from "../config";
 import { getBaseHttpClient } from "../clients";
-import { tightestRange } from "../math/tick-math";
+import {
+  amount0InToReachSqrt,
+  amount1InToReachSqrt,
+  managerActiveShareBps,
+} from "../math/depth";
+import { sqrtRatioAtTick, tightestRange } from "../math/tick-math";
 import { zeroAddress } from "viem";
 
 const BASE_TICK_SPACING = 200;
@@ -23,9 +28,38 @@ export type BasePoolReport = {
   range: { tickLower: number; tickUpper: number };
   activeLiquidity: string;
   managerStakedLiquidity: string;
+  managerStakedActiveLiquidity: string;
+  managerStakedActiveLiquidityShareBps: string | null;
   managerStakedTokenIds: string[];
+  priceMoveDepth: {
+    withPortfolio: { token0ToLower: string; token1ToUpper: string };
+    withoutPortfolio: { token0ToLower: string; token1ToUpper: string };
+  };
   balances: Array<{ symbol: string; amount: string }>;
 };
+
+function priceMoveAmounts(input: {
+  liquidity: bigint;
+  sqrtPriceX96: bigint;
+  sqrtLower: bigint;
+  sqrtUpper: bigint;
+  fee: bigint;
+  symbol0: string;
+  symbol1: string;
+  decimals0: number;
+  decimals1: number;
+}) {
+  return {
+    token0ToLower: `${formatUnits(
+      amount0InToReachSqrt(input.sqrtPriceX96, input.sqrtLower, input.liquidity, input.fee),
+      input.decimals0,
+    )} ${input.symbol0}`,
+    token1ToUpper: `${formatUnits(
+      amount1InToReachSqrt(input.sqrtPriceX96, input.sqrtUpper, input.liquidity, input.fee),
+      input.decimals1,
+    )} ${input.symbol1}`,
+  };
+}
 
 export async function buildBasePoolReport(input?: {
   client?: PublicClient;
@@ -103,8 +137,10 @@ export async function buildBasePoolReport(input?: {
 
   const gauge = getAddress(gaugeResult);
   const manager = getManagerAddressOrNull();
+  const tick = Number(slot0[1]);
   let managerStakedTokenIds: string[] = [];
   let managerStakedLiquidity = 0n;
+  let managerStakedActiveLiquidity = 0n;
   if (manager && gauge !== zeroAddress) {
     const [stakedLength] = await client.multicall({
       allowFailure: false,
@@ -144,7 +180,11 @@ export async function buildBasePoolReport(input?: {
           getAddress(position[3]) === BASE_ADDRESSES.musd &&
           Number(position[4]) === BASE_TICK_SPACING
         ) {
-          managerStakedLiquidity += BigInt(position[7]);
+          const positionLiquidity = BigInt(position[7]);
+          managerStakedLiquidity += positionLiquidity;
+          if (tick >= Number(position[5]) && tick < Number(position[6])) {
+            managerStakedActiveLiquidity += positionLiquidity;
+          }
         }
       }
     }
@@ -162,8 +202,16 @@ export async function buildBasePoolReport(input?: {
     decimals: Number(decimals1),
     balance: BigInt(balance1),
   };
-  const tick = Number(slot0[1]);
-
+  const poolLiquidity = BigInt(liquidity);
+  const feeRaw = BigInt(fee);
+  const range = tightestRange(tick, Number(tickSpacing));
+  const sqrtPriceX96 = BigInt(slot0[0]);
+  const sqrtLower = sqrtRatioAtTick(range.tickLower);
+  const sqrtUpper = sqrtRatioAtTick(range.tickUpper);
+  const liquidityWithoutPortfolio =
+    poolLiquidity > managerStakedActiveLiquidity
+      ? poolLiquidity - managerStakedActiveLiquidity
+      : 0n;
   return {
     chainId: 8453,
     pairLabel: "MUSD/MEZO",
@@ -184,10 +232,39 @@ export async function buildBasePoolReport(input?: {
     tickSpacing: Number(tickSpacing),
     fee: BigInt(fee).toString(),
     tick,
-    range: tightestRange(tick, Number(tickSpacing)),
-    activeLiquidity: BigInt(liquidity).toString(),
+    range,
+    activeLiquidity: poolLiquidity.toString(),
     managerStakedLiquidity: managerStakedLiquidity.toString(),
+    managerStakedActiveLiquidity: managerStakedActiveLiquidity.toString(),
+    managerStakedActiveLiquidityShareBps: managerActiveShareBps(
+      managerStakedActiveLiquidity,
+      poolLiquidity,
+    )?.toString() ?? null,
     managerStakedTokenIds,
+    priceMoveDepth: {
+      withPortfolio: priceMoveAmounts({
+        liquidity: poolLiquidity,
+        sqrtPriceX96,
+        sqrtLower,
+        sqrtUpper,
+        fee: feeRaw,
+        symbol0: metadata0.symbol,
+        symbol1: metadata1.symbol,
+        decimals0: metadata0.decimals,
+        decimals1: metadata1.decimals,
+      }),
+      withoutPortfolio: priceMoveAmounts({
+        liquidity: liquidityWithoutPortfolio,
+        sqrtPriceX96,
+        sqrtLower,
+        sqrtUpper,
+        fee: feeRaw,
+        symbol0: metadata0.symbol,
+        symbol1: metadata1.symbol,
+        decimals0: metadata0.decimals,
+        decimals1: metadata1.decimals,
+      }),
+    },
     balances: [
       { symbol: metadata0.symbol, amount: formatUnits(metadata0.balance, metadata0.decimals) },
       { symbol: metadata1.symbol, amount: formatUnits(metadata1.balance, metadata1.decimals) },

@@ -2,6 +2,11 @@ import type { BasePoolReport } from "@/lib/report/base-pool";
 import { formatAmount, shortenAddress } from "@/lib/utils";
 
 export function BasePoolCard({ report }: { report: BasePoolReport }) {
+  const depthRows = [
+    { label: "With portfolio liquidity", values: report.priceMoveDepth.withPortfolio },
+    { label: "Without portfolio liquidity", values: report.priceMoveDepth.withoutPortfolio },
+  ];
+
   return (
     <article className="flex h-full flex-col gap-4 rounded-2xl border border-sky-400/20 bg-gradient-to-b from-sky-400/[0.08] to-white/[0.02] p-4">
       <div className="flex items-start justify-between gap-3">
@@ -38,6 +43,15 @@ export function BasePoolCard({ report }: { report: BasePoolReport }) {
             {formatAmount(report.managerStakedLiquidity, 4)}
           </p>
         </div>
+        <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-2">
+          <p className="text-zinc-500">Portfolio active share</p>
+          <p className="font-mono text-lg font-semibold text-emerald-200">
+            {report.managerStakedActiveLiquidityShareBps == null
+              ? "n/a"
+              : `${(Number(report.managerStakedActiveLiquidityShareBps) / 100).toFixed(2)}%`}
+          </p>
+          <p className="mt-0.5 text-[10px] text-emerald-200/70">of pool active liquidity</p>
+        </div>
         <div>
           <p className="text-zinc-500">Fee / spacing</p>
           <p className="font-mono text-zinc-200">
@@ -55,6 +69,34 @@ export function BasePoolCard({ report }: { report: BasePoolReport }) {
             <p className="mt-1 font-mono text-sm text-zinc-100">
               {formatAmount(balance.amount, 6)}
             </p>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid gap-2">
+        {depthRows.map((row) => (
+          <div key={row.label} className="rounded-xl border border-white/5 bg-black/20 p-3">
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
+              {row.label}
+            </p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div>
+                <p className="text-[11px] text-zinc-500">
+                  Sell {report.token0.symbol} → leave lower
+                </p>
+                <p className="mt-0.5 font-mono text-sm text-zinc-100">
+                  {row.values.token0ToLower}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] text-zinc-500">
+                  Sell {report.token1.symbol} → leave upper
+                </p>
+                <p className="mt-0.5 font-mono text-sm text-zinc-100">
+                  {row.values.token1ToUpper}
+                </p>
+              </div>
+            </div>
           </div>
         ))}
       </div>
