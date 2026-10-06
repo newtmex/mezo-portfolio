@@ -8,6 +8,7 @@ import {
   amount1InToReachSqrt,
   managerActiveShareBps,
 } from "../math/depth";
+import { amountsForLiquidity } from "../math/amounts";
 import { sqrtRatioAtTick, tightestRange } from "../math/tick-math";
 import { zeroAddress } from "viem";
 
@@ -32,6 +33,7 @@ export type BasePoolReport = {
   managerStakedActiveLiquidityShareBps: string | null;
   aeroPerDay: number | null;
   aeroValueUsdPerDay: number | null;
+  managerStakedPositionValueUsd: number | null;
   managerStakedTokenIds: string[];
   priceMoveDepth: {
     withPortfolio: { token0ToLower: string; token1ToUpper: string };
@@ -143,6 +145,8 @@ export async function buildBasePoolReport(input?: {
   let managerStakedTokenIds: string[] = [];
   let managerStakedLiquidity = 0n;
   let managerStakedActiveLiquidity = 0n;
+  let managerPositionAmount0 = 0n;
+  let managerPositionAmount1 = 0n;
   if (manager && gauge !== zeroAddress) {
     const [stakedLength] = await client.multicall({
       allowFailure: false,
@@ -184,6 +188,14 @@ export async function buildBasePoolReport(input?: {
         ) {
           const positionLiquidity = BigInt(position[7]);
           managerStakedLiquidity += positionLiquidity;
+          const amounts = amountsForLiquidity(
+            BigInt(slot0[0]),
+            Number(position[5]),
+            Number(position[6]),
+            positionLiquidity,
+          );
+          managerPositionAmount0 += amounts.amount0;
+          managerPositionAmount1 += amounts.amount1;
           if (tick >= Number(position[5]) && tick < Number(position[6])) {
             managerStakedActiveLiquidity += positionLiquidity;
           }
@@ -214,6 +226,12 @@ export async function buildBasePoolReport(input?: {
     poolLiquidity > managerStakedActiveLiquidity
       ? poolLiquidity - managerStakedActiveLiquidity
       : 0n;
+  const sqrtPrice = Number(sqrtPriceX96) / Number(1n << 96n);
+  const musdPerMezo = sqrtPrice ** 2 * 10 ** (metadata0.decimals - metadata1.decimals);
+  const managerStakedPositionValueUsd = managerStakedLiquidity > 0n
+    ? Number(formatUnits(managerPositionAmount1, metadata1.decimals)) +
+      Number(formatUnits(managerPositionAmount0, metadata0.decimals)) * musdPerMezo
+    : null;
   let aeroPerDay: number | null = null;
   let aeroValueUsdPerDay: number | null = null;
   if (gauge !== zeroAddress && manager && poolLiquidity > 0n) {
@@ -283,6 +301,10 @@ export async function buildBasePoolReport(input?: {
     )?.toString() ?? null,
     aeroPerDay,
     aeroValueUsdPerDay,
+    managerStakedPositionValueUsd:
+      managerStakedPositionValueUsd != null && Number.isFinite(managerStakedPositionValueUsd)
+        ? managerStakedPositionValueUsd
+        : null,
     managerStakedTokenIds,
     priceMoveDepth: {
       withPortfolio: priceMoveAmounts({

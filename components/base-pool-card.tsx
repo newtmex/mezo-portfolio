@@ -32,6 +32,13 @@ export function BasePoolCard({ report }: { report: BasePoolReport }) {
             {formatUsd(report.aeroValueUsdPerDay)} per day
           </p>
         </div>
+        <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-2">
+          <p className="text-zinc-500">Portfolio position value</p>
+          <p className="font-mono text-lg font-semibold text-emerald-100">
+            {formatUsd(report.managerStakedPositionValueUsd)}
+          </p>
+          <p className="mt-0.5 text-[10px] text-emerald-200/70">At current pool price</p>
+        </div>
         <div>
           <p className="text-zinc-500">Tick</p>
           <p className="font-mono text-zinc-200">{report.tick}</p>
