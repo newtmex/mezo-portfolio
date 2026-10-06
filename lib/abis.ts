@@ -301,6 +301,27 @@ export const baseVoterAbi = [
 export const baseGaugeAbi = [
   {
     type: "function",
+    name: "rewardRate",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "periodFinish",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "rewardToken",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+  },
+  {
+    type: "function",
     name: "stakedLength",
     stateMutability: "view",
     inputs: [{ name: "depositor", type: "address" }],

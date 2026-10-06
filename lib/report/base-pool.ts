@@ -30,6 +30,8 @@ export type BasePoolReport = {
   managerStakedLiquidity: string;
   managerStakedActiveLiquidity: string;
   managerStakedActiveLiquidityShareBps: string | null;
+  aeroPerDay: number | null;
+  aeroValueUsdPerDay: number | null;
   managerStakedTokenIds: string[];
   priceMoveDepth: {
     withPortfolio: { token0ToLower: string; token1ToUpper: string };
@@ -212,6 +214,45 @@ export async function buildBasePoolReport(input?: {
     poolLiquidity > managerStakedActiveLiquidity
       ? poolLiquidity - managerStakedActiveLiquidity
       : 0n;
+  let aeroPerDay: number | null = null;
+  let aeroValueUsdPerDay: number | null = null;
+  if (gauge !== zeroAddress && manager && poolLiquidity > 0n) {
+    try {
+      const [rewardRate, periodFinish, rewardToken] = await client.multicall({
+        allowFailure: false,
+        contracts: [
+          { address: gauge, abi: baseGaugeAbi, functionName: "rewardRate" },
+          { address: gauge, abi: baseGaugeAbi, functionName: "periodFinish" },
+          { address: gauge, abi: baseGaugeAbi, functionName: "rewardToken" },
+        ],
+      });
+      const [rewardDecimals, rewardSymbol] = await client.multicall({
+        allowFailure: false,
+        contracts: [
+          { address: getAddress(rewardToken), abi: erc20Abi, functionName: "decimals" },
+          { address: getAddress(rewardToken), abi: erc20Abi, functionName: "symbol" },
+        ],
+      });
+      if (rewardSymbol.toUpperCase() === "AERO" && BigInt(periodFinish) > BigInt(Math.floor(Date.now() / 1000))) {
+        const managerShare = Number(managerStakedActiveLiquidity) / Number(poolLiquidity);
+        aeroPerDay = Number(formatUnits(BigInt(rewardRate), Number(rewardDecimals))) * 86_400 * managerShare;
+        try {
+          const response = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=aerodrome-finance&vs_currencies=usd", {
+            next: { revalidate: 300 },
+          });
+          if (response.ok) {
+            const body = (await response.json()) as { "aerodrome-finance"?: { usd?: number } };
+            const price = body["aerodrome-finance"]?.usd;
+            if (typeof price === "number" && Number.isFinite(price)) aeroValueUsdPerDay = aeroPerDay * price;
+          }
+        } catch {
+          // Keep the on-chain token amount available when the spot price API is unavailable.
+        }
+      }
+    } catch {
+      // Reward-rate methods are not implemented by every Aerodrome gauge.
+    }
+  }
   return {
     chainId: 8453,
     pairLabel: "MUSD/MEZO",
@@ -240,6 +281,8 @@ export async function buildBasePoolReport(input?: {
       managerStakedActiveLiquidity,
       poolLiquidity,
     )?.toString() ?? null,
+    aeroPerDay,
+    aeroValueUsdPerDay,
     managerStakedTokenIds,
     priceMoveDepth: {
       withPortfolio: priceMoveAmounts({

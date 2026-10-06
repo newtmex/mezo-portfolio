@@ -1,5 +1,5 @@
 import type { BasePoolReport } from "@/lib/report/base-pool";
-import { formatAmount, shortenAddress } from "@/lib/utils";
+import { formatAmount, formatUsd, shortenAddress } from "@/lib/utils";
 
 export function BasePoolCard({ report }: { report: BasePoolReport }) {
   const depthRows = [
@@ -23,6 +23,15 @@ export function BasePoolCard({ report }: { report: BasePoolReport }) {
       </div>
 
       <div className="grid grid-cols-2 gap-2 text-xs text-zinc-400 sm:grid-cols-4">
+        <div className="rounded-xl border border-sky-400/20 bg-sky-400/10 px-3 py-2">
+          <p className="text-zinc-500">Portfolio AERO / day</p>
+          <p className="font-mono text-lg font-semibold text-sky-100">
+            {report.aeroPerDay == null ? "n/a" : `${formatAmount(report.aeroPerDay, 5)} AERO`}
+          </p>
+          <p className="mt-0.5 text-[10px] text-sky-200/70">
+            {formatUsd(report.aeroValueUsdPerDay)} per day
+          </p>
+        </div>
         <div>
           <p className="text-zinc-500">Tick</p>
           <p className="font-mono text-zinc-200">{report.tick}</p>
