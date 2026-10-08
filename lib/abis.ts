@@ -156,6 +156,32 @@ export const clPoolAbi = [
   },
 ] as const;
 
+export const clTicksAbi = [
+  {
+    type: "function",
+    name: "tickBitmap",
+    stateMutability: "view",
+    inputs: [{ name: "wordPosition", type: "int16" }],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "ticks",
+    stateMutability: "view",
+    inputs: [{ name: "tick", type: "int24" }],
+    outputs: [
+      { name: "liquidityGross", type: "uint128" },
+      { name: "liquidityNet", type: "int128" },
+      { name: "feeGrowthOutside0X128", type: "uint256" },
+      { name: "feeGrowthOutside1X128", type: "uint256" },
+      { name: "tickCumulativeOutside", type: "int56" },
+      { name: "secondsPerLiquidityOutsideX128", type: "uint160" },
+      { name: "secondsOutside", type: "uint32" },
+      { name: "initialized", type: "bool" },
+    ],
+  },
+] as const;
+
 export const npmAbi = [
   {
     type: "function",

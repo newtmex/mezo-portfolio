@@ -1,6 +1,6 @@
 import { formatUnits, getAddress, type Address, type PublicClient } from "viem";
 
-import { erc20Abi, gaugeAbi } from "../abis";
+import { clTicksAbi, erc20Abi, gaugeAbi } from "../abis";
 import { getHttpClient } from "../clients";
 import { ADDRESSES, getManagerAddress, MEZO_CHAIN_ID, PAIRS, TRACKED_TOKENS } from "../config";
 import {
@@ -8,33 +8,27 @@ import {
   collectManagerPoolPositions,
   readManagerTokenHoldings,
 } from "./manager-liquidity";
-import { activeLiquidityAprPercent } from "./apr";
+import { activeLiquidityAprPercent, annualEmissionValueMusd } from "./apr";
 import { fetchMezoPriceMapMusd, lookupPriceMusd } from "./mezo-prices";
 import { resolveMostLiquidClPool } from "./pools";
+import { amountsForLiquidity } from "../math/amounts";
+import { sqrtRatioAtTick } from "../math/tick-math";
 import type { ClRangeDepthReport, ManagerRangeDepthPayload } from "./types";
 
-async function readPoolTvlMusd(input: {
+async function readInRangeLiquidityValueMusd(input: {
   client: PublicClient;
   pool: {
     address: Address;
     token0: Address;
     token1: Address;
+    tick: number;
+    tickSpacing: number;
+    sqrtPriceX96: bigint;
+    liquidity: bigint;
   };
   prices: ReadonlyMap<string, number>;
 }): Promise<number | null> {
-  const [balance0, balance1, decimals0, decimals1] = await Promise.all([
-    input.client.readContract({
-      address: input.pool.token0,
-      abi: erc20Abi,
-      functionName: "balanceOf",
-      args: [input.pool.address],
-    }),
-    input.client.readContract({
-      address: input.pool.token1,
-      abi: erc20Abi,
-      functionName: "balanceOf",
-      args: [input.pool.address],
-    }),
+  const [decimals0, decimals1] = await Promise.all([
     input.client.readContract({
       address: input.pool.token0,
       abi: erc20Abi,
@@ -49,8 +43,65 @@ async function readPoolTvlMusd(input: {
   const price0 = lookupPriceMusd(input.prices, input.pool.token0);
   const price1 = lookupPriceMusd(input.prices, input.pool.token1);
   if (price0 == null || price1 == null) return null;
-  const value0 = Number(formatUnits(balance0, decimals0)) * price0;
-  const value1 = Number(formatUnits(balance1, decimals1)) * price1;
+  const minTick = Math.ceil(-887272 / input.pool.tickSpacing) * input.pool.tickSpacing;
+  const maxTick = Math.floor(887272 / input.pool.tickSpacing) * input.pool.tickSpacing;
+  const compressedCurrent = Math.floor(input.pool.tick / input.pool.tickSpacing);
+  const minWord = Math.floor(Math.floor(minTick / input.pool.tickSpacing) / 256);
+  const maxWord = Math.floor(Math.floor(maxTick / input.pool.tickSpacing) / 256);
+  const wordPositions = Array.from({ length: maxWord - minWord + 1 }, (_, i) => minWord + i);
+  const bitmaps = await input.client.multicall({
+    allowFailure: false,
+    contracts: wordPositions.map((word) => ({
+      address: input.pool.address,
+      abi: clTicksAbi,
+      functionName: "tickBitmap" as const,
+      args: [word] as const,
+    })),
+  });
+  const initializedTicks: number[] = [];
+  for (const [wordIndex, bitmapValue] of bitmaps.entries()) {
+    let bitmap = BigInt(bitmapValue);
+    while (bitmap !== 0n) {
+      const leastBit = bitmap & -bitmap;
+      const bit = leastBit.toString(2).length - 1;
+      const compressed = (wordPositions[wordIndex] * 256 + bit) * input.pool.tickSpacing;
+      if (compressed >= minTick && compressed <= maxTick) initializedTicks.push(compressed);
+      bitmap ^= leastBit;
+    }
+  }
+  const ticks = await input.client.multicall({
+    allowFailure: true,
+    contracts: initializedTicks.map((tick) => ({
+      address: input.pool.address,
+      abi: clTicksAbi,
+      functionName: "ticks" as const,
+      args: [tick] as const,
+    })),
+  });
+  let activeLiquidity = 0n;
+  for (const [index, result] of ticks.entries()) {
+    if (result.status !== "success" || !result.result[7]) continue;
+    if (initializedTicks[index] <= input.pool.tick) activeLiquidity += BigInt(result.result[1]);
+  }
+  if (activeLiquidity !== input.pool.liquidity) {
+    console.warn("[admin-report] Tick liquidity sum differs from pool active liquidity", {
+      pool: input.pool.address,
+      tick: input.pool.tick,
+      currentCompressedTick: compressedCurrent,
+      summed: activeLiquidity.toString(),
+      poolLiquidity: input.pool.liquidity.toString(),
+    });
+    activeLiquidity = input.pool.liquidity;
+  }
+  if (activeLiquidity <= 0n) return null;
+  const amounts = amountsForLiquidity(
+    input.pool.sqrtPriceX96,
+    -887272,
+    887272,
+    activeLiquidity,
+  );
+  const value0 = Number(formatUnits(amounts.amount0, decimals0)) * price0;
+  const value1 = Number(formatUnits(amounts.amount1, decimals1)) * price1;
   const total = value0 + value1;
   return Number.isFinite(total) && total > 0 ? total : null;
 }
@@ -60,13 +111,38 @@ async function readLiveGaugeRewardRate(
   gauge: Address,
   timestamp: bigint,
 ): Promise<bigint> {
+  const [rewardRate, periodFinish] = await Promise.all([
+    client.readContract({ address: gauge, abi: gaugeAbi, functionName: "rewardRate" }),
+    client.readContract({ address: gauge, abi: gaugeAbi, functionName: "periodFinish" }),
+  ]);
+  if (periodFinish <= timestamp) return 0n;
+  return rewardRate;
+}
+
+async function readLiveGaugeAnnualEmissionValue(
+  client: PublicClient,
+  gauge: Address,
+  timestamp: bigint,
+  prices: ReadonlyMap<string, number>,
+): Promise<number | null> {
   const [rewardRate, periodFinish, rewardToken] = await Promise.all([
     client.readContract({ address: gauge, abi: gaugeAbi, functionName: "rewardRate" }),
     client.readContract({ address: gauge, abi: gaugeAbi, functionName: "periodFinish" }),
     client.readContract({ address: gauge, abi: gaugeAbi, functionName: "rewardToken" }),
   ]);
-  if (getAddress(rewardToken) !== ADDRESSES.mezo || periodFinish <= timestamp) return 0n;
-  return rewardRate;
+  if (periodFinish <= timestamp) return 0;
+  const token = getAddress(rewardToken);
+  const [decimals, symbol] = await Promise.all([
+    client.readContract({ address: token, abi: erc20Abi, functionName: "decimals" }),
+    client.readContract({ address: token, abi: erc20Abi, functionName: "symbol" }),
+  ]);
+  if (token !== ADDRESSES.mezo && symbol.toUpperCase() !== "AERO") return 0;
+  const price = lookupPriceMusd(prices, token, symbol);
+  return annualEmissionValueMusd({
+    rewardRate,
+    rewardDecimals: Number(decimals),
+    rewardPriceMusd: price,
+  });
 }
 
 export async function buildManagerRangeDepthReport(input?: {
@@ -92,53 +168,53 @@ export async function buildManagerRangeDepthReport(input?: {
 
   const latestBlock = await client.getBlock();
   const gaugePools = pairSnapshots.map(({ pool }) => pool).filter((pool) => pool.gauge);
-  const gaugeCalls = gaugePools.flatMap((pool) => [
-    { address: pool.gauge, abi: gaugeAbi, functionName: "rewardRate" as const },
-    { address: pool.gauge, abi: gaugeAbi, functionName: "periodFinish" as const },
-    { address: pool.gauge, abi: gaugeAbi, functionName: "rewardToken" as const },
-  ]);
-  const gaugeResults = await client.multicall({ contracts: gaugeCalls, allowFailure: true });
-  const aggregateEmissionRates = gaugePools.map((_, index) => {
-    const results = gaugeResults.slice(index * 3, index * 3 + 3);
-    if (results.some((result) => result.status === "failure")) return 0n;
-    const [rewardRate, periodFinish, rewardToken] = results.map((result) => result.result) as [
-      bigint,
-      bigint,
-      Address,
-    ];
-    if (getAddress(rewardToken) !== ADDRESSES.mezo || periodFinish <= latestBlock.timestamp) {
-      return 0n;
-    }
-    return rewardRate;
-  });
-
-  const rewardRatesByGauge = new Map(
-    gaugePools.map((pool, index) => [
-      pool.gauge.toLowerCase(),
-      aggregateEmissionRates[index] ?? 0n,
-    ]),
+  const aggregateEmissionRates = await Promise.all(
+    gaugePools.map((pool) =>
+      readLiveGaugeRewardRate(client, pool.gauge, latestBlock.timestamp).catch(() => 0n),
+    ),
   );
+  const annualEmissionValues = await Promise.all(
+    gaugePools.map((pool) =>
+      readLiveGaugeAnnualEmissionValue(client, pool.gauge, latestBlock.timestamp, prices).catch(
+        () => null,
+      ),
+    ),
+  );
+
   const mezoPrice = lookupPriceMusd(prices, TRACKED_TOKENS[1].address, "MEZO");
 
   const reports = await Promise.all(
     pairSnapshots.map(async ({ pair, pool }) => {
-      const [report, poolTvlMusd] = await Promise.all([
+      const [report, inRangeLiquidityValueMusd] = await Promise.all([
         buildClRangeDepthReport({
           client,
           pairLabel: pair.label,
           pool,
           managerAddress: manager,
         }),
-        readPoolTvlMusd({ client, pool, prices }),
+        readInRangeLiquidityValueMusd({
+          client,
+          pool: {
+            address: pool.address,
+            token0: pool.token0,
+            token1: pool.token1,
+            tick: pool.tick,
+            tickSpacing: pool.tickSpacing,
+            sqrtPriceX96: pool.sqrtPriceX96,
+            liquidity: pool.liquidity,
+          },
+          prices,
+        }),
       ]);
+      const gaugeIndex = gaugePools.findIndex(
+        (candidate) => candidate.gauge.toLowerCase() === pool.gauge.toLowerCase(),
+      );
+      const annualRewardValueMusd = annualEmissionValues[gaugeIndex];
       return {
         ...report,
         activeLiquidityApr: activeLiquidityAprPercent({
-          rewardRate: rewardRatesByGauge.get(pool.gauge.toLowerCase()) ?? 0n,
-          mezoPriceMusd: mezoPrice,
-          poolTvlMusd,
-          activeLiquidity: pool.liquidity,
-          stakedLiquidity: pool.stakedLiquidity,
+          annualRewardValueMusd: annualRewardValueMusd ?? Number.NaN,
+          inRangeLiquidityValueMusd,
         }),
       };
     }),
@@ -250,19 +326,30 @@ export async function buildPoolRangeDepthReport(
     pair.label,
     pair.knownPool,
   );
-  const [report, rewardRate, poolTvlMusd] = await Promise.all([
+  const [report, annualRewardValueMusd, inRangeLiquidityValueMusd] = await Promise.all([
     buildClRangeDepthReport({ client, pairLabel: pair.label, pool, managerAddress: manager }),
-    readLiveGaugeRewardRate(client, pool.gauge, latestBlock.timestamp),
-    readPoolTvlMusd({ client, pool, prices }),
+    readLiveGaugeAnnualEmissionValue(client, pool.gauge, latestBlock.timestamp, prices).catch(
+      () => null,
+    ),
+    readInRangeLiquidityValueMusd({
+      client,
+      pool: {
+        address: pool.address,
+        token0: pool.token0,
+        token1: pool.token1,
+        tick: pool.tick,
+        tickSpacing: pool.tickSpacing,
+        sqrtPriceX96: pool.sqrtPriceX96,
+        liquidity: pool.liquidity,
+      },
+      prices,
+    }),
   ]);
   return {
     ...report,
     activeLiquidityApr: activeLiquidityAprPercent({
-      rewardRate,
-      mezoPriceMusd: lookupPriceMusd(prices, TRACKED_TOKENS[1].address, "MEZO"),
-      poolTvlMusd,
-      activeLiquidity: pool.liquidity,
-      stakedLiquidity: pool.stakedLiquidity,
+      annualRewardValueMusd: annualRewardValueMusd ?? Number.NaN,
+      inRangeLiquidityValueMusd,
     }),
   };
 }
