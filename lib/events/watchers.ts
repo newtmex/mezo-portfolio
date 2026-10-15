@@ -324,14 +324,14 @@ export function startBasePoolEventWatchers(
   watch(poolBurnEvent);
 
   if (gauge && !/^0x0{40}$/i.test(gauge)) {
-    unsubscribers.push(client.watchEvent({
+    unsubscribers.push(client.watchEvent<typeof gaugeDepositEvent>({
       address: gauge,
       event: gaugeDepositEvent,
       args: { user: manager },
       onLogs: onLogs("Deposit", `Manager deposited NFT into ${source} gauge`),
       onError: () => handlers.onState("reconnecting"),
     }));
-    unsubscribers.push(client.watchEvent({
+    unsubscribers.push(client.watchEvent<typeof gaugeWithdrawEvent>({
       address: gauge,
       event: gaugeWithdrawEvent,
       args: { user: manager },
@@ -340,14 +340,14 @@ export function startBasePoolEventWatchers(
     }));
   }
 
-  unsubscribers.push(client.watchEvent({
+  unsubscribers.push(client.watchEvent<typeof nftTransferEvent>({
     address: BASE_ADDRESSES.npm,
     event: nftTransferEvent,
     args: { from: manager },
     onLogs: onLogs("Transfer", "Manager transferred out a Base position NFT"),
     onError: () => handlers.onState("reconnecting"),
   }));
-  unsubscribers.push(client.watchEvent({
+  unsubscribers.push(client.watchEvent<typeof nftTransferEvent>({
     address: BASE_ADDRESSES.npm,
     event: nftTransferEvent,
     args: { to: manager },
@@ -358,14 +358,14 @@ export function startBasePoolEventWatchers(
     { symbol: "MEZO", address: BASE_ADDRESSES.mezo },
     { symbol: "MUSD", address: BASE_ADDRESSES.musd },
   ]) {
-    unsubscribers.push(client.watchEvent({
+    unsubscribers.push(client.watchEvent<typeof erc20TransferEvent>({
       address: token.address,
       event: erc20TransferEvent,
       args: { from: manager },
       onLogs: onLogs("Transfer", `Manager sent Base ${token.symbol}`),
       onError: () => handlers.onState("reconnecting"),
     }));
-    unsubscribers.push(client.watchEvent({
+    unsubscribers.push(client.watchEvent<typeof erc20TransferEvent>({
       address: token.address,
       event: erc20TransferEvent,
       args: { to: manager },
