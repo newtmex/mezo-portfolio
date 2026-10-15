@@ -15,7 +15,7 @@ import { PoolDepthCard } from "@/components/pool-depth-card";
 import { PortfolioSummary } from "@/components/portfolio-summary";
 import { TokenHoldingsTable } from "@/components/token-holdings-table";
 import type { LiveEventItem, WsConnectionState } from "@/lib/events/types";
-import { startManagerEventWatchers } from "@/lib/events/watchers";
+import { startBasePoolEventWatchers, startManagerEventWatchers } from "@/lib/events/watchers";
 import { PAIRS } from "@/lib/config";
 import type { ClRangeDepthReport } from "@/lib/report/types";
 import type { BasePoolReport } from "@/lib/report/base-pool";
@@ -87,6 +87,7 @@ function playUpdateSound(volume: number) {
 export function Dashboard() {
   const queryClient = useQueryClient();
   const [wsState, setWsState] = useState<WsConnectionState>("idle");
+  const [baseWsState, setBaseWsState] = useState<WsConnectionState>("idle");
   const [events, setEvents] = useState<LiveEventItem[]>([]);
   const [activityOpen, setActivityOpen] = useState(false);
   const [alertsEnabled, setAlertsEnabled] = useState(false);
@@ -147,6 +148,10 @@ export function Dashboard() {
         void queryClient.invalidateQueries({ queryKey: ["range-depth"] });
         return;
       }
+      if (source === "Aerodrome MUSD/MEZO") {
+        void queryClient.invalidateQueries({ queryKey: ["base-pool"] });
+        return;
+      }
       void queryClient.invalidateQueries({ queryKey: ["range-depth"] });
       void queryClient.invalidateQueries({ queryKey: ["pool-range-depth"] });
     },
@@ -176,6 +181,30 @@ export function Dashboard() {
     });
     return () => handle.stop();
   }, [alertsEnabled, manager, onRefreshNeeded, volume]);
+
+  useEffect(() => {
+    if (!manager || !basePoolQuery.data) return;
+    const handle = startBasePoolEventWatchers(manager, basePoolQuery.data.gauge, {
+      onEvent: (event) => {
+        if (alertsEnabled) {
+          if (volume > 0) playUpdateSound(volume);
+          if ("Notification" in window && Notification.permission === "granted") {
+            new Notification(`Portfolio update · ${event.kind}`, {
+              body: `${event.source}: ${event.summary}`,
+              tag: event.id,
+            });
+          }
+        }
+        setEvents((prev) => {
+          if (prev.some((row) => row.id === event.id)) return prev;
+          return [event, ...prev].slice(0, 50);
+        });
+      },
+      onState: setBaseWsState,
+      onRefreshNeeded,
+    });
+    return () => handle.stop();
+  }, [alertsEnabled, basePoolQuery.data?.gauge, manager, onRefreshNeeded, volume]);
 
   if (query.isLoading && !query.data && poolQueries.every((pool) => pool.isLoading)) {
     return (
@@ -293,6 +322,7 @@ export function Dashboard() {
         manager={manager}
         fetchedAt={data?.fetchedAt}
         wsState={wsState}
+        baseWsState={baseWsState}
         refreshing={
           query.isFetching ||
           poolQueries.some((pool) => pool.isFetching) ||

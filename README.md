@@ -10,7 +10,7 @@ It displays portfolio totals, token balances, CL positions, pool range depth, ac
 - Calculates each pool's active-liquidity APR from the USD value of live MEZO/AERO gauge emissions divided by the USD value of current in-range liquidity.
 - Shows token balances and CL positions in portfolio dropdowns beside the wallet address.
 - Keeps live activity hidden by default in a foldable right-side panel.
-- Does not poll automatically. Data refreshes after watched on-chain events, including swaps, liquidity changes, token transfers, NFT transfers, and gauge deposits/withdrawals.
+- Does not poll automatically. Data refreshes after watched on-chain events, including Mezo swaps, liquidity changes, token transfers, NFT transfers, gauge deposits/withdrawals, and Aerodrome Base pool swaps, liquidity changes, and manager gauge deposits/withdrawals.
 - Refreshes the affected pool and portfolio valuation after pool events; wallet and position events refresh the portfolio report.
 - Uses Mezo API prices for standard tokens and derives `avBTCm`/`avMEZOm` prices from the configured Aurove CL pools when the API does not provide wrapper prices.
 - Tracks the Base Aerodrome Slipstream MUSD/MEZO CL200 pool independently of the Mezo portfolio report; Base pool reads do not block Mezo dashboard data.
@@ -19,7 +19,7 @@ It displays portfolio totals, token balances, CL positions, pool range depth, ac
 
 - Next.js App Router + TypeScript
 - Tailwind CSS v4
-- viem for Mezo HTTP RPC and WebSocket subscriptions
+- viem for Mezo and Base HTTP RPC and WebSocket subscriptions
 - TanStack Query for event-triggered data invalidation
 - Radix UI for accessible portfolio dropdowns
 
@@ -46,10 +46,12 @@ Open [http://127.0.0.1:3001](http://127.0.0.1:3001).
 | `MEZO_RPC_WSS` / `NEXT_PUBLIC_MEZO_RPC_WSS`   | Mezo WebSocket endpoint for live events           |
 | `BASE_RPC_HTTP` / `NEXT_PUBLIC_BASE_RPC_HTTP` | Primary Base HTTPS JSON-RPC endpoint              |
 | `BASE_RPC_HTTP_FALLBACKS`                     | Comma-separated Base RPC fallback endpoints       |
+| `BASE_RPC_WSS` / `NEXT_PUBLIC_BASE_RPC_WSS`   | Base WebSocket endpoint for Aerodrome live events |
 | `MEZO_POOLS_API_BASE_URL`                     | Optional Mezo pools API base URL override         |
 | `MEZO_API_BASE_URL`                           | Optional Mezo API base URL override               |
 | `NEXT_PUBLIC_MEZO_API_BASE_URL`               | Optional browser-visible API base URL override    |
 | `NEXT_PUBLIC_MEZO_EXPLORER`                   | Optional Mezo explorer URL override               |
+| `NEXT_PUBLIC_BASE_EXPLORER`                   | Optional Base explorer URL override               |
 
 The default API base is `https://api.mezo.org`; Base reads use PublicNode, LlamaRPC, and the official public RPC as fallbacks. For production, set `BASE_RPC_HTTP` to a dedicated provider URL and keep optional fallbacks in `BASE_RPC_HTTP_FALLBACKS`. No private keys are used.
 

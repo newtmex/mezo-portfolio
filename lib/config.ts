@@ -42,6 +42,14 @@ export const BASE_RPC_HTTP_FALLBACKS = [
   .map((url) => url.trim())
   .filter((url, index, urls) => Boolean(url) && urls.indexOf(url) === index);
 
+export const BASE_RPC_WSS =
+  process.env.BASE_RPC_WSS?.trim() ||
+  process.env.NEXT_PUBLIC_BASE_RPC_WSS?.trim() ||
+  "wss://base-rpc.publicnode.com";
+
+export const BASE_EXPLORER =
+  process.env.NEXT_PUBLIC_BASE_EXPLORER?.trim() || "https://basescan.org";
+
 export const ADDRESSES = {
   btc: getAddress("0x7b7C000000000000000000000000000000000000"),
   mezo: getAddress("0x7B7c000000000000000000000000000000000001"),

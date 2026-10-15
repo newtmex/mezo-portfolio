@@ -10,6 +10,7 @@ export type LiveEventKind =
 
 export type LiveEventItem = {
   id: string;
+  chain: "mezo" | "base";
   kind: LiveEventKind;
   source: string;
   summary: string;

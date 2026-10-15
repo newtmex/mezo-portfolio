@@ -2,8 +2,8 @@
 
 import { type Address, type Log, type PublicClient, parseAbiItem } from "viem";
 
-import { createWsClient } from "../clients";
-import { ADDRESSES, PAIRS, TRACKED_TOKENS } from "../config";
+import { createBaseWsClient, createWsClient } from "../clients";
+import { ADDRESSES, BASE_ADDRESSES, PAIRS, TRACKED_TOKENS } from "../config";
 import type { LiveEventItem, LiveEventKind, WsConnectionState } from "./types";
 
 type WatchHandlers = {
@@ -40,6 +40,7 @@ function makeId(log: Log): string {
 
 function pushEvent(
   handlers: WatchHandlers,
+  chain: LiveEventItem["chain"],
   kind: LiveEventKind,
   source: string,
   summary: string,
@@ -47,7 +48,8 @@ function pushEvent(
 ): void {
   if (!log.transactionHash) return;
   handlers.onEvent({
-    id: makeId(log),
+    id: `${chain}-${makeId(log)}`,
+    chain,
     kind,
     source,
     summary,
@@ -104,7 +106,7 @@ export function startManagerEventWatchers(
         onLogs: (logs) => {
           handlers.onState("connected");
           for (const log of logs) {
-            pushEvent(wrapped, "Swap", pool.label, `Pool swap on ${pool.label}`, log);
+            pushEvent(wrapped, "mezo", "Swap", pool.label, `Pool swap on ${pool.label}`, log);
           }
         },
         onError: () => handlers.onState("reconnecting"),
@@ -117,7 +119,7 @@ export function startManagerEventWatchers(
         onLogs: (logs) => {
           handlers.onState("connected");
           for (const log of logs) {
-            pushEvent(wrapped, "Mint", pool.label, `Liquidity minted on ${pool.label}`, log);
+            pushEvent(wrapped, "mezo", "Mint", pool.label, `Liquidity minted on ${pool.label}`, log);
           }
         },
         onError: () => handlers.onState("reconnecting"),
@@ -130,7 +132,7 @@ export function startManagerEventWatchers(
         onLogs: (logs) => {
           handlers.onState("connected");
           for (const log of logs) {
-            pushEvent(wrapped, "Burn", pool.label, `Liquidity burned on ${pool.label}`, log);
+            pushEvent(wrapped, "mezo", "Burn", pool.label, `Liquidity burned on ${pool.label}`, log);
           }
         },
         onError: () => handlers.onState("reconnecting"),
@@ -148,6 +150,7 @@ export function startManagerEventWatchers(
             for (const log of logs) {
               pushEvent(
                 wrapped,
+                "mezo",
                 "Deposit",
                 pool.label,
                 `Manager deposited NFT into ${pool.label} gauge`,
@@ -168,6 +171,7 @@ export function startManagerEventWatchers(
             for (const log of logs) {
               pushEvent(
                 wrapped,
+                "mezo",
                 "Withdraw",
                 pool.label,
                 `Manager withdrew NFT from ${pool.label} gauge`,
@@ -189,7 +193,7 @@ export function startManagerEventWatchers(
       onLogs: (logs) => {
         handlers.onState("connected");
         for (const log of logs) {
-          pushEvent(wrapped, "Transfer", "NPM", "Manager transferred out a position NFT", log);
+          pushEvent(wrapped, "mezo", "Transfer", "NPM", "Manager transferred out a position NFT", log);
         }
       },
       onError: () => handlers.onState("reconnecting"),
@@ -203,7 +207,7 @@ export function startManagerEventWatchers(
       onLogs: (logs) => {
         handlers.onState("connected");
         for (const log of logs) {
-          pushEvent(wrapped, "Transfer", "NPM", "Manager received a position NFT", log);
+          pushEvent(wrapped, "mezo", "Transfer", "NPM", "Manager received a position NFT", log);
         }
       },
       onError: () => handlers.onState("reconnecting"),
@@ -220,6 +224,7 @@ export function startManagerEventWatchers(
           for (const log of logs) {
             pushEvent(
               wrapped,
+              "mezo",
               "Transfer",
               token.symbol,
               `Manager sent ${token.symbol}`,
@@ -240,6 +245,7 @@ export function startManagerEventWatchers(
           for (const log of logs) {
             pushEvent(
               wrapped,
+              "mezo",
               "Transfer",
               token.symbol,
               `Manager received ${token.symbol}`,
@@ -259,6 +265,120 @@ export function startManagerEventWatchers(
     stop: () => {
       stopped = true;
       for (const timer of debounceTimers.values()) clearTimeout(timer);
+      for (const unsub of unsubscribers) {
+        try {
+          unsub();
+        } catch {
+          // ignore
+        }
+      }
+      handlers.onState("idle");
+    },
+  };
+}
+
+/** Subscribe to the Aerodrome Slipstream pool and manager gauge events over Base WSS. */
+export function startBasePoolEventWatchers(
+  manager: Address,
+  gauge: Address | null,
+  handlers: WatchHandlers,
+): EventWatcherHandle {
+  const client: PublicClient = createBaseWsClient();
+  const unsubscribers: Array<() => void> = [];
+  let stopped = false;
+  let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+  const source = "Aerodrome MUSD/MEZO";
+  const refresh = () => {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      debounceTimer = undefined;
+      if (!stopped) handlers.onRefreshNeeded(source);
+    }, 600);
+  };
+  const push = (kind: LiveEventKind, summary: string, log: Log) => {
+    pushEvent({ ...handlers, onRefreshNeeded: refresh }, "base", kind, source, summary, log);
+  };
+  const onLogs = (kind: LiveEventKind, summary: string) => (logs: Log[]) => {
+    handlers.onState("connected");
+    for (const log of logs) push(kind, summary, log);
+  };
+  const watch = (event: typeof poolSwapEvent | typeof poolMintEvent | typeof poolBurnEvent) => {
+    unsubscribers.push(client.watchEvent({
+      address: BASE_ADDRESSES.pool,
+      event,
+      onLogs: (logs) => {
+        handlers.onState("connected");
+        for (const log of logs) {
+          if (event === poolSwapEvent) push("Swap", `Pool swap on ${source}`, log);
+          else if (event === poolMintEvent) push("Mint", `Liquidity minted on ${source}`, log);
+          else push("Burn", `Liquidity burned on ${source}`, log);
+        }
+      },
+      onError: () => handlers.onState("reconnecting"),
+    }));
+  };
+
+  handlers.onState("connecting");
+  watch(poolSwapEvent);
+  watch(poolMintEvent);
+  watch(poolBurnEvent);
+
+  if (gauge && !/^0x0{40}$/i.test(gauge)) {
+    unsubscribers.push(client.watchEvent({
+      address: gauge,
+      event: gaugeDepositEvent,
+      args: { user: manager },
+      onLogs: onLogs("Deposit", `Manager deposited NFT into ${source} gauge`),
+      onError: () => handlers.onState("reconnecting"),
+    }));
+    unsubscribers.push(client.watchEvent({
+      address: gauge,
+      event: gaugeWithdrawEvent,
+      args: { user: manager },
+      onLogs: onLogs("Withdraw", `Manager withdrew NFT from ${source} gauge`),
+      onError: () => handlers.onState("reconnecting"),
+    }));
+  }
+
+  unsubscribers.push(client.watchEvent({
+    address: BASE_ADDRESSES.npm,
+    event: nftTransferEvent,
+    args: { from: manager },
+    onLogs: onLogs("Transfer", "Manager transferred out a Base position NFT"),
+    onError: () => handlers.onState("reconnecting"),
+  }));
+  unsubscribers.push(client.watchEvent({
+    address: BASE_ADDRESSES.npm,
+    event: nftTransferEvent,
+    args: { to: manager },
+    onLogs: onLogs("Transfer", "Manager received a Base position NFT"),
+    onError: () => handlers.onState("reconnecting"),
+  }));
+  for (const token of [
+    { symbol: "MEZO", address: BASE_ADDRESSES.mezo },
+    { symbol: "MUSD", address: BASE_ADDRESSES.musd },
+  ]) {
+    unsubscribers.push(client.watchEvent({
+      address: token.address,
+      event: erc20TransferEvent,
+      args: { from: manager },
+      onLogs: onLogs("Transfer", `Manager sent Base ${token.symbol}`),
+      onError: () => handlers.onState("reconnecting"),
+    }));
+    unsubscribers.push(client.watchEvent({
+      address: token.address,
+      event: erc20TransferEvent,
+      args: { to: manager },
+      onLogs: onLogs("Transfer", `Manager received Base ${token.symbol}`),
+      onError: () => handlers.onState("reconnecting"),
+    }));
+  }
+
+  handlers.onState("connected");
+  return {
+    stop: () => {
+      stopped = true;
+      if (debounceTimer) clearTimeout(debounceTimer);
       for (const unsub of unsubscribers) {
         try {
           unsub();

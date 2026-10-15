@@ -5,13 +5,14 @@ import type { ReactNode } from "react";
 
 import { ConnectionStatus } from "@/components/connection-status";
 import type { WsConnectionState } from "@/lib/events/types";
-import { MEZO_CHAIN_ID, MEZO_EXPLORER } from "@/lib/config";
+import { BASE_CHAIN_ID, MEZO_CHAIN_ID, MEZO_EXPLORER } from "@/lib/config";
 import { explorerAddressUrl, shortenAddress } from "@/lib/utils";
 
 export function DashboardHeader(props: {
   manager: string;
   fetchedAt?: string;
   wsState: WsConnectionState;
+  baseWsState: WsConnectionState;
   refreshing: boolean;
   onRefresh: () => void;
   portfolioControls?: ReactNode;
@@ -27,6 +28,10 @@ export function DashboardHeader(props: {
             Mezo {MEZO_CHAIN_ID}
           </span>
           <ConnectionStatus state={props.wsState} />
+          <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-zinc-300">
+            Base {BASE_CHAIN_ID}
+          </span>
+          <ConnectionStatus state={props.baseWsState} />
         </div>
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-50 sm:text-3xl">
           Portfolio range depth

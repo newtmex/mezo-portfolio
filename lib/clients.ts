@@ -10,6 +10,7 @@ import {
 import {
   BASE_CHAIN_ID,
   BASE_RPC_HTTP_FALLBACKS,
+  BASE_RPC_WSS,
   MEZO_CHAIN_ID,
   MEZO_EXPLORER,
   MEZO_RPC_HTTP,
@@ -44,7 +45,7 @@ export const baseMainnet = defineChain({
   name: "Base",
   nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
   rpcUrls: {
-    default: { http: BASE_RPC_HTTP_FALLBACKS },
+    default: { http: BASE_RPC_HTTP_FALLBACKS, webSocket: [BASE_RPC_WSS] },
   },
   contracts: {
     multicall3: {
@@ -83,6 +84,16 @@ export function createWsClient(): PublicClient {
   return createPublicClient({
     chain: mezoMainnet,
     transport: webSocket(MEZO_RPC_WSS, {
+      reconnect: true,
+      retryCount: 10,
+    }),
+  });
+}
+
+export function createBaseWsClient(): PublicClient {
+  return createPublicClient({
+    chain: baseMainnet,
+    transport: webSocket(BASE_RPC_WSS, {
       reconnect: true,
       retryCount: 10,
     }),
