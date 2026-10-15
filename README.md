@@ -11,7 +11,7 @@ It displays portfolio totals, token balances, CL positions, pool range depth, ac
 - Shows token balances and CL positions in portfolio dropdowns beside the wallet address.
 - Keeps live activity hidden by default in a foldable right-side panel.
 - Does not poll automatically. Data refreshes after watched on-chain events, including Mezo swaps, liquidity changes, token transfers, NFT transfers, gauge deposits/withdrawals, and Aerodrome Base pool swaps, liquidity changes, and manager gauge deposits/withdrawals.
-- Refreshes the affected pool and portfolio valuation after pool events; wallet and position events refresh the portfolio report.
+- Refreshes the affected Mezo pool and portfolio valuation after pool events; wallet and position events refresh the portfolio report. Aerodrome Base pool, gauge, and manager activity refreshes the Base report and its displayed update time.
 - Uses Mezo API prices for standard tokens and derives `avBTCm`/`avMEZOm` prices from the configured Aurove CL pools when the API does not provide wrapper prices.
 - Tracks the Base Aerodrome Slipstream MUSD/MEZO CL200 pool independently of the Mezo portfolio report; Base pool reads do not block Mezo dashboard data.
 

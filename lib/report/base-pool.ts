@@ -17,6 +17,7 @@ const BASE_TICK_SPACING = 200;
 export type BasePoolReport = {
   chainId: 8453;
   pairLabel: "MUSD/MEZO";
+  fetchedAt: string;
   pool: Address;
   factory: Address;
   gauge: Address | null;
@@ -274,6 +275,7 @@ export async function buildBasePoolReport(input?: {
   return {
     chainId: 8453,
     pairLabel: "MUSD/MEZO",
+    fetchedAt: new Date().toISOString(),
     pool: resolvedPool,
     factory: BASE_ADDRESSES.clFactory,
     gauge: gauge === zeroAddress ? null : gauge,
