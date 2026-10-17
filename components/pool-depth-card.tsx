@@ -41,13 +41,6 @@ export function PoolDepthCard({ report }: { report: ClRangeDepthReport }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 text-xs text-zinc-400 sm:grid-cols-4">
-        <div>
-          <p className="text-zinc-500">Tick</p>
-          <p className="font-mono text-zinc-200">{report.tick}</p>
-        </div>
-      </div>
-
       <div className="h-2 overflow-hidden rounded-full bg-white/5">
         <div
           className="h-full rounded-full bg-gradient-to-r from-amber-400 to-orange-500"
