@@ -98,29 +98,30 @@ function PriceMarker({
       {/* Vertical price marker with a larger drag hit target */}
       <div
         className={cn(
-          "relative flex h-12 w-8 items-center justify-center",
+          "relative flex h-10 w-6 items-center justify-center",
           draggable && "active:cursor-ew-resize",
         )}
       >
-        <div className={cn("h-10 w-[2px] rounded-full", lineClass)} />
+        <div className={cn("h-8 w-[2px] rounded-full", lineClass)} />
       </div>
+      {/* Label sits beside the pointer, tucked against the range line */}
       <div
         className={cn(
-          "pointer-events-none absolute w-max",
+          "pointer-events-none absolute flex w-max flex-col leading-tight",
           isCurrent
-            ? "bottom-[calc(100%+0.15rem)] right-[calc(50%+0.35rem)] text-right"
-            : "top-[calc(100%+0.15rem)] left-[calc(50%+0.35rem)] text-left",
+            ? "bottom-[calc(50%+0.35rem)] right-[calc(50%+0.3rem)] items-end text-right"
+            : "top-[calc(50%+0.35rem)] left-[calc(50%+0.3rem)] items-start text-left",
         )}
       >
-        <p
+        <span
           className={cn(
             "text-[10px] font-semibold uppercase tracking-wide",
             isCurrent ? "text-zinc-200" : accent === "sky" ? "text-sky-200" : "text-amber-200",
           )}
         >
           {label}
-        </p>
-        <p className="font-mono text-[11px] text-zinc-100">{priceLabel}</p>
+        </span>
+        <span className="font-mono text-[11px] text-zinc-100">{priceLabel}</span>
       </div>
     </div>
   );
@@ -470,7 +471,7 @@ export function TargetPriceSellPanel({
         <div
           ref={trackRef}
           className={cn(
-            "relative mx-1 h-20 touch-none",
+            "relative mx-1 h-14 touch-none",
             dragging ? "cursor-ew-resize" : "cursor-pointer",
           )}
           onPointerDown={onTrackPointerDown}
