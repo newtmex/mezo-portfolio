@@ -21,7 +21,7 @@ export function BasePoolCard({ report }: { report: BasePoolReport }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 text-xs text-zinc-400 sm:grid-cols-4">
+      <div className="grid grid-cols-3 gap-2 text-xs text-zinc-400">
         <div className="rounded-xl border border-sky-400/20 bg-sky-400/10 px-3 py-2">
           <p className="text-zinc-500">Portfolio AERO / day</p>
           <p className="font-mono text-lg font-semibold text-sky-100">
