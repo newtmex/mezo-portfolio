@@ -75,6 +75,8 @@ export function BasePoolCard({ report }: { report: BasePoolReport }) {
         fee={report.fee}
         withLiquidity={report.activeLiquidity}
         withoutLiquidity={report.activeLiquidityWithoutManager}
+        tickLower={report.range.tickLower}
+        tickUpper={report.range.tickUpper}
         accent="sky"
       />
 

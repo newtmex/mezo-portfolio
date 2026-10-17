@@ -64,6 +64,8 @@ export function PoolDepthCard({ report }: { report: ClRangeDepthReport }) {
         fee={report.fee}
         withLiquidity={report.activeLiquidity}
         withoutLiquidity={report.activeLiquidityWithoutManager}
+        tickLower={report.range.tickLower}
+        tickUpper={report.range.tickUpper}
         accent="amber"
       />
 
