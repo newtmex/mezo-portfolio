@@ -9,6 +9,7 @@ import {
   managerActiveShareBps,
 } from "../math/depth";
 import { amountsForLiquidity } from "../math/amounts";
+import { humanPriceToken1PerToken0 } from "../math/price";
 import { sqrtRatioAtTick, tightestRange } from "../math/tick-math";
 import { zeroAddress } from "viem";
 
@@ -28,7 +29,11 @@ export type BasePoolReport = {
   fee: string;
   tick: number;
   range: { tickLower: number; tickUpper: number };
+  sqrtPriceX96: string;
+  /** Human-readable token1 per token0 (decimal-adjusted). */
+  priceToken1PerToken0: number;
   activeLiquidity: string;
+  activeLiquidityWithoutManager: string;
   managerStakedLiquidity: string;
   managerStakedActiveLiquidity: string;
   managerStakedActiveLiquidityShareBps: string | null;
@@ -294,7 +299,14 @@ export async function buildBasePoolReport(input?: {
     fee: BigInt(fee).toString(),
     tick,
     range,
+    sqrtPriceX96: sqrtPriceX96.toString(),
+    priceToken1PerToken0: humanPriceToken1PerToken0(
+      sqrtPriceX96,
+      metadata0.decimals,
+      metadata1.decimals,
+    ),
     activeLiquidity: poolLiquidity.toString(),
+    activeLiquidityWithoutManager: liquidityWithoutPortfolio.toString(),
     managerStakedLiquidity: managerStakedLiquidity.toString(),
     managerStakedActiveLiquidity: managerStakedActiveLiquidity.toString(),
     managerStakedActiveLiquidityShareBps: managerActiveShareBps(

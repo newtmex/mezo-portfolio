@@ -10,6 +10,7 @@ import {
   formatBpsPercent,
   managerActiveShareBps,
 } from "../math/depth";
+import { humanPriceToken1PerToken0 } from "../math/price";
 import { sqrtRatioAtTick, tightestRange } from "../math/tick-math";
 import { lookupPriceMusd, valueRawAmountMusd } from "./mezo-prices";
 import type { ClPoolSnapshot } from "./pools";
@@ -20,15 +21,8 @@ import type {
   ManagerTokenHolding,
 } from "./types";
 
-const Q96 = 1n << 96n;
-
 function positionInRange(tick: number, tickLower: number, tickUpper: number): boolean {
   return tick >= tickLower && tick < tickUpper;
-}
-
-function priceToken1PerToken0(sqrtPriceX96: bigint): number {
-  const ratio = Number(sqrtPriceX96) / Number(Q96);
-  return ratio * ratio;
 }
 
 function formatDepth(amount: bigint, symbol: string, decimals: number): DepthSide {
@@ -206,9 +200,13 @@ export async function buildClRangeDepthReport(input: {
     tick: input.pool.tick,
     range,
     sqrtPriceX96: input.pool.sqrtPriceX96.toString(),
-    priceToken1PerToken0: priceToken1PerToken0(input.pool.sqrtPriceX96),
-    token0: { address: input.pool.token0, symbol: symbol0 },
-    token1: { address: input.pool.token1, symbol: symbol1 },
+    priceToken1PerToken0: humanPriceToken1PerToken0(
+      input.pool.sqrtPriceX96,
+      Number(decimals0),
+      Number(decimals1),
+    ),
+    token0: { address: input.pool.token0, symbol: symbol0, decimals: Number(decimals0) },
+    token1: { address: input.pool.token1, symbol: symbol1, decimals: Number(decimals1) },
     manager: input.managerAddress,
     managerInRangeLiquidity: managerLiquidity.toString(),
     managerStakedInRangeLiquidity: managerStakedLiquidity.toString(),

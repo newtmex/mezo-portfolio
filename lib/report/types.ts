@@ -15,9 +15,10 @@ export type ClRangeDepthReport = {
   tick: number;
   range: { tickLower: number; tickUpper: number };
   sqrtPriceX96: string;
+  /** Human-readable token1 per token0 (decimal-adjusted). */
   priceToken1PerToken0: number;
-  token0: { address: string; symbol: string };
-  token1: { address: string; symbol: string };
+  token0: { address: string; symbol: string; decimals: number };
+  token1: { address: string; symbol: string; decimals: number };
   manager: string | null;
   managerInRangeLiquidity: string;
   managerStakedInRangeLiquidity: string;
