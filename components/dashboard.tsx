@@ -388,6 +388,18 @@ export function Dashboard() {
       {data ? <PortfolioSummary data={data} /> : null}
 
       <section className="grid gap-4 xl:grid-cols-3">
+        {basePoolQuery.data ? (
+          <BasePoolCard report={basePoolQuery.data} />
+        ) : basePoolQuery.isError ? (
+          <div className="min-h-64 rounded-2xl border border-rose-500/20 bg-rose-500/5 p-4 text-sm text-rose-200">
+            Base MUSD/MEZO tracking unavailable:{" "}
+            {basePoolQuery.error instanceof Error ? basePoolQuery.error.message : "Unknown error"}
+          </div>
+        ) : (
+          <div className="min-h-64 rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-zinc-500">
+            Loading Base MUSD/MEZO tracking…
+          </div>
+        )}
         {PAIRS.map((pair, index) =>
           poolQueries[index].data ? (
             <PoolDepthCard key={pair.key} report={poolQueries[index].data} />
@@ -399,21 +411,6 @@ export function Dashboard() {
               Loading {pair.label}…
             </div>
           ),
-        )}
-      </section>
-
-      <section>
-        {basePoolQuery.data ? (
-          <BasePoolCard report={basePoolQuery.data} />
-        ) : basePoolQuery.isError ? (
-          <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-4 text-sm text-rose-200">
-            Base MUSD/MEZO tracking unavailable:{" "}
-            {basePoolQuery.error instanceof Error ? basePoolQuery.error.message : "Unknown error"}
-          </div>
-        ) : (
-          <div className="min-h-40 rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-zinc-500">
-            Loading Base MUSD/MEZO tracking…
-          </div>
         )}
       </section>
     </div>

@@ -11,10 +11,6 @@ import {
 import { formatUnits } from "viem";
 
 import {
-  depthDiffRatioBps,
-  formatBpsPercent,
-} from "@/lib/math/depth";
-import {
   type BuyToken,
   humanPriceToken1PerToken0,
   sellAmountToReachHumanPrice,
@@ -224,11 +220,6 @@ export function TargetPriceSellPanel({
       }),
     [sqrt, targetPrice, buyToken, withoutLiquidity, feeRaw, decimals0, decimals1],
   );
-
-  const depthDiff =
-    withResult.ok && withoutResult.ok
-      ? formatBpsPercent(depthDiffRatioBps(withResult.amountRaw, withoutResult.amountRaw))
-      : "n/a";
 
   const sharedError =
     !withResult.ok && !withoutResult.ok
@@ -539,10 +530,6 @@ export function TargetPriceSellPanel({
         </div>
       </div>
 
-      <div className="rounded-xl border border-white/5 bg-black/20 p-3 text-sm">
-        <p className="text-[11px] text-zinc-500">Depth Δ % {sellSymbol}</p>
-        <p className="font-mono text-zinc-100">{depthDiff}</p>
-      </div>
     </div>
   );
 }

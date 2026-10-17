@@ -84,14 +84,6 @@ export type PairConfig = {
 
 export const PAIRS: readonly PairConfig[] = [
   {
-    key: "musd-avbtcm",
-    label: "MUSD/avBTCm",
-    tokenA: ADDRESSES.musd,
-    tokenB: ADDRESSES.avBtcm,
-    knownPool: getAddress("0xB018BED3b3376cE95ee34db170348FA16d18e29D"),
-    knownGauge: getAddress("0xC5d9ddC440759CCe340c745a6133c7A29E90cF94"),
-  },
-  {
     key: "mezo-musd",
     label: "MEZO/MUSD",
     tokenA: ADDRESSES.mezo,
@@ -113,6 +105,14 @@ export const PAIRS: readonly PairConfig[] = [
     tokenB: ADDRESSES.avMezom,
     knownPool: getAddress("0xE639b9B1fb72C8ea2Fea246Ba0ad0ed7ddfB0E1C"),
     knownGauge: getAddress("0xCd1b3cAB8715e66a5c00F420C84742f6406059eF"),
+  },
+  {
+    key: "musd-avbtcm",
+    label: "MUSD/avBTCm",
+    tokenA: ADDRESSES.musd,
+    tokenB: ADDRESSES.avBtcm,
+    knownPool: getAddress("0xB018BED3b3376cE95ee34db170348FA16d18e29D"),
+    knownGauge: getAddress("0xC5d9ddC440759CCe340c745a6133c7A29E90cF94"),
   },
 ] as const;
 
