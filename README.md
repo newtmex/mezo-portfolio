@@ -6,7 +6,7 @@ It displays portfolio totals, token balances, CL positions, pool range depth, ac
 
 ## Behavior
 
-- Covers `MUSD/avBTCm`, `MEZO/MUSD`, `MEZO/BTC`, and `avBTCm/avMEZOm`.
+- Covers `mUSDC/BTC`, `MUSD/avBTCm`, `MEZO/MUSD`, `MEZO/BTC`, and `avBTCm/avMEZOm`.
 - Calculates each pool's active-liquidity APR from the USD value of live MEZO/AERO gauge emissions divided by the USD value of current in-range liquidity.
 - Shows token balances and CL positions in portfolio dropdowns beside the wallet address.
 - Keeps live activity hidden by default in a foldable right-side panel.

@@ -54,6 +54,7 @@ export const ADDRESSES = {
   btc: getAddress("0x7b7C000000000000000000000000000000000000"),
   mezo: getAddress("0x7B7c000000000000000000000000000000000001"),
   musd: getAddress("0xdD468A1DDc392dcdbEf6db6e34E89AA338F9F186"),
+  musdc: getAddress("0x04671C72Aab5AC02A03c1098314b1BB6B560c197"),
   avBtcm: getAddress("0xf333171788dE7005695b2E8FB9cAE97Ba9c4dD7a"),
   avMezom: getAddress("0xb894b11A78B762c82Cb095148F5BC11DC93C3560"),
   clFactory: getAddress("0xBB24AF5c6fB88F1d191FA76055e30BF881BeEb79"),
@@ -71,7 +72,7 @@ export const BASE_ADDRESSES = {
   npm: getAddress("0xe1f8cd9AC4e4A65F54f38a5CdAfCA44f6dD68b53"),
 } as const;
 
-export type PairKey = "musd-avbtcm" | "mezo-musd" | "avbtcm-avmezom" | "mezo-btc";
+export type PairKey = "musd-avbtcm" | "mezo-musd" | "avbtcm-avmezom" | "mezo-btc" | "musdc-btc";
 
 export type PairConfig = {
   key: PairKey;
@@ -99,6 +100,14 @@ export const PAIRS: readonly PairConfig[] = [
     knownPool: getAddress("0x907D055978943c69cffD5eD969F5603Af104aCc5"),
   },
   {
+    key: "musdc-btc",
+    label: "mUSDC/BTC",
+    tokenA: ADDRESSES.musdc,
+    tokenB: ADDRESSES.btc,
+    knownPool: getAddress("0x96185a2f430C1183C1A01c0931bfe528af6d7Cc0"),
+    knownGauge: getAddress("0x65e35015b3a4dcdccC0Fc0114799740FFe4E4C5F"),
+  },
+  {
     key: "avbtcm-avmezom",
     label: "avBTCm/avMEZOm",
     tokenA: ADDRESSES.avBtcm,
@@ -120,6 +129,7 @@ export const TRACKED_TOKENS = [
   { symbol: "BTC", address: ADDRESSES.btc },
   { symbol: "MEZO", address: ADDRESSES.mezo },
   { symbol: "MUSD", address: ADDRESSES.musd },
+  { symbol: "mUSDC", address: ADDRESSES.musdc },
   { symbol: "avBTCm", address: ADDRESSES.avBtcm },
   { symbol: "avMEZOm", address: ADDRESSES.avMezom },
 ] as const;
