@@ -3,11 +3,13 @@
 import {
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
+import { ChevronDown } from "lucide-react";
 import { formatUnits } from "viem";
 
 import {
@@ -173,6 +175,8 @@ export function TargetPriceSellPanel({
 
   const [buyToken, setBuyToken] = useState<BuyToken>(1);
   const [targetInput, setTargetInput] = useState(() => formatPriceInput(currentPrice));
+  const [priceUnitOpen, setPriceUnitOpen] = useState(false);
+  const priceUnitId = useId();
   const [dragging, setDragging] = useState(false);
   const [lockedAxis, setLockedAxis] = useState<{ low: number; high: number } | null>(null);
 
@@ -395,139 +399,154 @@ export function TargetPriceSellPanel({
   return (
     <div className="flex flex-col gap-3">
       <div className="rounded-xl border border-white/10 bg-black/20 p-3">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <label className="min-w-[10rem] flex-1">
-            <span className="text-[11px] uppercase tracking-wide text-zinc-500">
-              Target price ({symbol1} per {symbol0})
-            </span>
-            <input
-              type="number"
-              inputMode="decimal"
-              step="any"
-              value={targetInput}
-              onChange={(event) => {
-                const value = event.target.value;
-                setTargetInput(value);
-                const next = Number(value);
-                if (Number.isFinite(next) && next > 0 && Number.isFinite(currentPrice) && currentPrice > 0) {
-                  if (Math.abs(next - currentPrice) / currentPrice >= 1e-6) {
-                    setBuyToken(buyTokenForTarget(next, currentPrice));
-                  }
-                }
-              }}
-              className="mt-1 w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 font-mono text-sm text-zinc-100 outline-none ring-0 placeholder:text-zinc-600 focus:border-white/25"
-              placeholder={formatPriceInput(currentPrice) || "0"}
-            />
-          </label>
-          <div>
-            <p className="text-[11px] uppercase tracking-wide text-zinc-500">Buy token</p>
-            <div className={cn("mt-1 inline-flex rounded-lg border p-0.5", toggleClass)}>
-              <button
-                type="button"
-                onClick={() => setBuyToken(0)}
+        <button
+          type="button"
+          aria-expanded={priceUnitOpen}
+          aria-controls={priceUnitId}
+          onClick={() => setPriceUnitOpen((open) => !open)}
+          className="flex w-full items-center justify-between gap-3 text-left"
+        >
+          <span className="text-[11px] font-medium uppercase tracking-wide text-zinc-400">
+            Target price
+          </span>
+          <ChevronDown
+            aria-hidden="true"
+            className={cn("h-4 w-4 text-zinc-500 transition-transform", priceUnitOpen && "rotate-180")}
+          />
+        </button>
+
+        {priceUnitOpen ? (
+          <div id={priceUnitId}>
+            <div className="mt-2">
+              <label className="sr-only" htmlFor={`${priceUnitId}-input`}>
+                Target price ({symbol1} per {symbol0})
+              </label>
+              <span className="flex min-w-0 overflow-hidden rounded-lg border border-white/10 bg-black/40 focus-within:border-white/25">
+                <input
+                  id={`${priceUnitId}-input`}
+                  type="number"
+                  inputMode="decimal"
+                  step="any"
+                  value={targetInput}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setTargetInput(value);
+                    const next = Number(value);
+                    if (Number.isFinite(next) && next > 0 && Number.isFinite(currentPrice) && currentPrice > 0) {
+                      if (Math.abs(next - currentPrice) / currentPrice >= 1e-6) {
+                        setBuyToken(buyTokenForTarget(next, currentPrice));
+                      }
+                    }
+                  }}
+                  className="min-w-0 flex-1 bg-transparent px-3 py-2 font-mono text-sm text-zinc-100 outline-none placeholder:text-zinc-600"
+                  placeholder={formatPriceInput(currentPrice) || "0"}
+                />
+                <span className={cn("inline-flex shrink-0 items-center rounded-r-lg border-l p-0.5", toggleClass)}>
+                  <button
+                    type="button"
+                    aria-pressed={buyToken === 0}
+                    onClick={() => setBuyToken(0)}
+                    className={cn(
+                      "rounded-md px-2.5 py-1.5 text-xs font-medium transition",
+                      buyToken === 0 ? activeToggleClass : "text-zinc-400 hover:text-zinc-200",
+                    )}
+                  >
+                    {symbol0}
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={buyToken === 1}
+                    onClick={() => setBuyToken(1)}
+                    className={cn(
+                      "rounded-md px-2.5 py-1.5 text-xs font-medium transition",
+                      buyToken === 1 ? activeToggleClass : "text-zinc-400 hover:text-zinc-200",
+                    )}
+                  >
+                    {symbol1}
+                  </button>
+                </span>
+              </span>
+            </div>
+            <p className="mt-2 text-[11px] text-zinc-500">
+              Buy {buySymbol} by selling {sellSymbol} · prices in {symbol1} per {symbol0}
+            </p>
+            {sharedError ? <p className="mt-2 text-[11px] text-rose-300/90">{sharedError}</p> : null}
+
+            <div className="mt-4 border-t border-white/10 pt-3">
+              <div className={cn("mb-2 flex min-h-[2.75rem] flex-col justify-end", amountAlign)}>
+                <p className="text-[10px] uppercase tracking-wide text-zinc-500">With portfolio</p>
+                <p className="font-mono text-sm text-zinc-100">
+                  {sharedError ? "—" : `Sell ${withLabel}`}
+                </p>
+              </div>
+
+              <div
+                ref={trackRef}
                 className={cn(
-                  "rounded-md px-2.5 py-1.5 text-xs font-medium transition",
-                  buyToken === 0 ? activeToggleClass : "text-zinc-400 hover:text-zinc-200",
+                  "relative mx-1 h-14 touch-none",
+                  dragging ? "cursor-ew-resize" : "cursor-pointer",
                 )}
+                onPointerDown={onTrackPointerDown}
               >
-                {symbol0}
-              </button>
-              <button
-                type="button"
-                onClick={() => setBuyToken(1)}
-                className={cn(
-                  "rounded-md px-2.5 py-1.5 text-xs font-medium transition",
-                  buyToken === 1 ? activeToggleClass : "text-zinc-400 hover:text-zinc-200",
-                )}
-              >
-                {symbol1}
-              </button>
+                <div
+                  className={cn(
+                    "pointer-events-none absolute inset-x-0 top-1/2 h-0.5 -translate-y-1/2 rounded-full",
+                    thinLineClass,
+                  )}
+                />
+                <div
+                  className={cn(
+                    "pointer-events-none absolute top-1/2 h-3 -translate-y-1/2 rounded-full",
+                    activeRangeClass,
+                  )}
+                  style={{ left: `${axis.activeLeft * 100}%`, width: `${axis.activeWidth * 100}%` }}
+                  title={`Active tick spacing · ${formatPriceInput(activeRange.lower)} → ${formatPriceInput(activeRange.upper)}`}
+                />
+                {!axis.nearSpot && hasTarget ? (
+                  <div
+                    className={cn(
+                      "pointer-events-none absolute top-1/2 h-0.5 -translate-y-1/2 rounded-full",
+                      moveClass,
+                    )}
+                    style={{ left: `${moveLeft * 100}%`, width: `${Math.max(moveWidth * 100, 0.5)}%` }}
+                  />
+                ) : null}
+
+                <PriceMarker
+                  pct={axis.currentPct}
+                  label="Current"
+                  priceLabel={formatPriceInput(currentPrice) || "n/a"}
+                  tone="current"
+                  accent={accent}
+                />
+                {hasTarget ? (
+                  <PriceMarker
+                    pct={axis.projectedPct}
+                    label="Projected"
+                    priceLabel={formatPriceInput(targetPrice) || "n/a"}
+                    tone="projected"
+                    accent={accent}
+                    draggable
+                    onPointerDown={onProjectedPointerDown}
+                  />
+                ) : null}
+              </div>
+
+              <div className={cn("mt-2 flex min-h-[2.75rem] flex-col justify-start", amountAlign)}>
+                <p className="text-[10px] uppercase tracking-wide text-zinc-500">Without portfolio</p>
+                <p className="font-mono text-sm text-zinc-100">
+                  {sharedError ? "—" : `Sell ${withoutLabel}`}
+                </p>
+              </div>
+
+              <div className="mt-2 flex justify-between text-[10px] text-zinc-600">
+                <span>{formatPriceInput(axis.low)}</span>
+                <span>{symbol1}/{symbol0}</span>
+                <span>{formatPriceInput(axis.high)}</span>
+              </div>
             </div>
           </div>
-        </div>
-        <p className="mt-2 text-[11px] text-zinc-500">
-          Buy {buySymbol} by selling {sellSymbol} · prices in {symbol1} per {symbol0}
-        </p>
-        {sharedError ? <p className="mt-2 text-[11px] text-rose-300/90">{sharedError}</p> : null}
-      </div>
-
-      <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-3">
-        <div className={cn("mb-2 flex min-h-[2.75rem] flex-col justify-end", amountAlign)}>
-          <p className="text-[10px] uppercase tracking-wide text-zinc-500">With portfolio</p>
-          <p className="font-mono text-sm text-zinc-100">
-            {sharedError ? "—" : `Sell ${withLabel}`}
-          </p>
-        </div>
-
-        <div
-          ref={trackRef}
-          className={cn(
-            "relative mx-1 h-14 touch-none",
-            dragging ? "cursor-ew-resize" : "cursor-pointer",
-          )}
-          onPointerDown={onTrackPointerDown}
-        >
-          {/* Full price axis (thin) */}
-          <div
-            className={cn(
-              "pointer-events-none absolute inset-x-0 top-1/2 h-0.5 -translate-y-1/2 rounded-full",
-              thinLineClass,
-            )}
-          />
-          {/* Active tick-spacing band (thick) */}
-          <div
-            className={cn(
-              "pointer-events-none absolute top-1/2 h-3 -translate-y-1/2 rounded-full",
-              activeRangeClass,
-            )}
-            style={{
-              left: `${axis.activeLeft * 100}%`,
-              width: `${axis.activeWidth * 100}%`,
-            }}
-            title={`Active tick spacing · ${formatPriceInput(activeRange.lower)} → ${formatPriceInput(activeRange.upper)}`}
-          />
-          {!axis.nearSpot && hasTarget ? (
-            <div
-              className={cn(
-                "pointer-events-none absolute top-1/2 h-0.5 -translate-y-1/2 rounded-full",
-                moveClass,
-              )}
-              style={{ left: `${moveLeft * 100}%`, width: `${Math.max(moveWidth * 100, 0.5)}%` }}
-            />
-          ) : null}
-
-          <PriceMarker
-            pct={axis.currentPct}
-            label="Current"
-            priceLabel={formatPriceInput(currentPrice) || "n/a"}
-            tone="current"
-            accent={accent}
-          />
-          {hasTarget ? (
-            <PriceMarker
-              pct={axis.projectedPct}
-              label="Projected"
-              priceLabel={formatPriceInput(targetPrice) || "n/a"}
-              tone="projected"
-              accent={accent}
-              draggable
-              onPointerDown={onProjectedPointerDown}
-            />
-          ) : null}
-        </div>
-
-        <div className={cn("mt-2 flex min-h-[2.75rem] flex-col justify-start", amountAlign)}>
-          <p className="text-[10px] uppercase tracking-wide text-zinc-500">Without portfolio</p>
-          <p className="font-mono text-sm text-zinc-100">
-            {sharedError ? "—" : `Sell ${withoutLabel}`}
-          </p>
-        </div>
-
-        <div className="mt-2 flex justify-between text-[10px] text-zinc-600">
-          <span>{formatPriceInput(axis.low)}</span>
-          <span>{symbol1}/{symbol0}</span>
-          <span>{formatPriceInput(axis.high)}</span>
-        </div>
+        ) : null}
       </div>
 
     </div>
