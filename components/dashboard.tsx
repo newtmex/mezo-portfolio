@@ -22,8 +22,7 @@ import type { BasePoolReport } from "@/lib/report/base-pool";
 
 async function fetchRangeDepth() {
   const response = await fetch("/api/range-depth", { cache: "no-store" });
-  if (!response.ok)
-    throw new Error((await response.json()).error ?? "Failed to fetch range-depth report");
+  if (!response.ok) throw new Error("An error occurred while loading range-depth data.");
   return response.json();
 }
 
@@ -31,7 +30,7 @@ async function fetchPool(key: string): Promise<ClRangeDepthReport> {
   const response = await fetch(`/api/range-depth?pool=${encodeURIComponent(key)}`, {
     cache: "no-store",
   });
-  if (!response.ok) throw new Error((await response.json()).error ?? `Failed to fetch ${key}`);
+  if (!response.ok) throw new Error("An error occurred while loading range-depth data.");
   return response.json();
 }
 
@@ -223,9 +222,9 @@ export function Dashboard() {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="max-w-lg rounded-2xl border border-rose-500/30 bg-rose-500/10 px-6 py-8 text-center">
-          <p className="text-sm font-medium text-rose-100">Failed to load range-depth report</p>
+          <p className="text-sm font-medium text-rose-100">An error occurred</p>
           <p className="mt-2 text-xs text-rose-200/80">
-            {query.error instanceof Error ? query.error.message : "Unknown error"}
+            Some range-depth data could not be loaded. Please try again.
           </p>
           <button
             type="button"
@@ -385,6 +384,15 @@ export function Dashboard() {
         }}
       />
 
+      {data?.hasPartialErrors ? (
+        <div
+          role="status"
+          className="rounded-xl border border-rose-500/20 bg-rose-500/5 px-4 py-3 text-sm text-rose-200"
+        >
+          An error occurred while loading some data. Other available data is shown below.
+        </div>
+      ) : null}
+
       {data ? <PortfolioSummary data={data} /> : null}
 
       <section className="grid gap-4 xl:grid-cols-3">
@@ -403,6 +411,13 @@ export function Dashboard() {
         {PAIRS.map((pair, index) =>
           poolQueries[index].data ? (
             <PoolDepthCard key={pair.key} report={poolQueries[index].data} />
+          ) : poolQueries[index].isError ? (
+            <div
+              key={pair.key}
+              className="min-h-64 rounded-2xl border border-rose-500/20 bg-rose-500/5 p-4 text-sm text-rose-200"
+            >
+              {pair.label}: An error occurred while loading this data.
+            </div>
           ) : (
             <div
               key={pair.key}

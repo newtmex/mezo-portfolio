@@ -47,6 +47,7 @@ export async function collectManagerRangeLiquidity(input: {
   stakedLiquidity: bigint;
   tokenIds: bigint[];
   stakedIds: bigint[];
+  hasErrors: boolean;
 }> {
   const tokenIds: bigint[] = [];
   const stakedIds: bigint[] = [];
@@ -73,38 +74,78 @@ export async function collectManagerRangeLiquidity(input: {
 
   let liquidity = 0n;
   let stakedLiquidity = 0n;
-  const walletCount = await input.client.readContract({
-    address: ADDRESSES.npm,
-    abi: npmAbi,
-    functionName: "balanceOf",
-    args: [input.manager],
-  });
-  if (walletCount > BigInt(Number.MAX_SAFE_INTEGER)) {
-    throw new Error(`Manager NFT count ${walletCount.toString()} exceeds the safe limit.`);
-  }
-  for (let index = 0; index < Number(walletCount); index += 1) {
-    const tokenId = await input.client.readContract({
+  let hasErrors = false;
+  let walletCount: bigint | null = null;
+  try {
+    walletCount = await input.client.readContract({
       address: ADDRESSES.npm,
       abi: npmAbi,
-      functionName: "tokenOfOwnerByIndex",
-      args: [input.manager, BigInt(index)],
+      functionName: "balanceOf",
+      args: [input.manager],
     });
-    liquidity += await consider(tokenId, false);
+    if (walletCount > BigInt(Number.MAX_SAFE_INTEGER)) {
+      throw new Error(`Manager NFT count ${walletCount.toString()} exceeds the safe limit.`);
+    }
+  } catch (error) {
+    hasErrors = true;
+    console.error("[admin-report] Failed to read manager wallet NFT count", {
+      manager: input.manager,
+      error,
+    });
+  }
+  if (walletCount != null) {
+    for (let index = 0; index < Number(walletCount); index += 1) {
+      try {
+        const tokenId = await input.client.readContract({
+          address: ADDRESSES.npm,
+          abi: npmAbi,
+          functionName: "tokenOfOwnerByIndex",
+          args: [input.manager, BigInt(index)],
+        });
+        liquidity += await consider(tokenId, false);
+      } catch (error) {
+        hasErrors = true;
+        console.error("[admin-report] Failed to read manager wallet NFT", {
+          manager: input.manager,
+          index,
+          error,
+        });
+      }
+    }
   }
 
-  const staked = await input.client.readContract({
-    address: input.gauge,
-    abi: gaugeAbi,
-    functionName: "stakedValues",
-    args: [input.manager],
-  });
-  for (const tokenId of staked) {
-    const amount = await consider(tokenId, true);
-    liquidity += amount;
-    stakedLiquidity += amount;
+  try {
+    const staked = await input.client.readContract({
+      address: input.gauge,
+      abi: gaugeAbi,
+      functionName: "stakedValues",
+      args: [input.manager],
+    });
+    for (const tokenId of staked) {
+      try {
+        const amount = await consider(tokenId, true);
+        liquidity += amount;
+        stakedLiquidity += amount;
+      } catch (error) {
+        hasErrors = true;
+        console.error("[admin-report] Failed to read staked manager NFT", {
+          manager: input.manager,
+          gauge: input.gauge,
+          tokenId: tokenId.toString(),
+          error,
+        });
+      }
+    }
+  } catch (error) {
+    hasErrors = true;
+    console.error("[admin-report] Failed to read staked manager NFTs", {
+      manager: input.manager,
+      gauge: input.gauge,
+      error,
+    });
   }
 
-  return { liquidity, stakedLiquidity, tokenIds, stakedIds };
+  return { liquidity, stakedLiquidity, tokenIds, stakedIds, hasErrors };
 }
 
 export async function buildClRangeDepthReport(input: {
@@ -141,6 +182,7 @@ export async function buildClRangeDepthReport(input: {
   let managerStakedLiquidity = 0n;
   let managerTokenIds: bigint[] = [];
   let managerStakedIds: bigint[] = [];
+  let hasPartialErrors = false;
   if (input.managerAddress) {
     const found = await collectManagerRangeLiquidity({
       client: input.client,
@@ -155,6 +197,7 @@ export async function buildClRangeDepthReport(input: {
     managerStakedLiquidity = found.stakedLiquidity;
     managerTokenIds = found.tokenIds;
     managerStakedIds = found.stakedIds;
+    hasPartialErrors = found.hasErrors;
   }
 
   const sqrtLower = sqrtRatioAtTick(range.tickLower);
@@ -231,6 +274,7 @@ export async function buildClRangeDepthReport(input: {
       sellToken0ToLeaveLower: row.toLower,
       sellToken1ToLeaveUpper: row.toUpper,
     })),
+    hasPartialErrors,
   };
 }
 
@@ -239,8 +283,8 @@ export async function readManagerTokenHoldings(input: {
   manager: Address;
   tokens: ReadonlyArray<{ symbol: string; address: Address }>;
   prices: ReadonlyMap<string, number>;
-}): Promise<ManagerTokenHolding[]> {
-  return Promise.all(
+}): Promise<{ holdings: ManagerTokenHolding[]; hasErrors: boolean }> {
+  const results = await Promise.allSettled(
     input.tokens.map(async (token) => {
       const [raw, decimals] = await Promise.all([
         input.client.readContract({
@@ -267,6 +311,22 @@ export async function readManagerTokenHoldings(input: {
       } satisfies ManagerTokenHolding;
     }),
   );
+  const holdings: ManagerTokenHolding[] = [];
+  let hasErrors = false;
+  results.forEach((result, index) => {
+    if (result.status === "fulfilled") {
+      holdings.push(result.value);
+      return;
+    }
+    hasErrors = true;
+    console.error("[admin-report] Failed to read manager token holding", {
+      manager: input.manager,
+      token: input.tokens[index].address,
+      symbol: input.tokens[index].symbol,
+      error: result.reason,
+    });
+  });
+  return { holdings, hasErrors };
 }
 
 export async function collectManagerPoolPositions(input: {
@@ -279,74 +339,119 @@ export async function collectManagerPoolPositions(input: {
   decimals0: number;
   decimals1: number;
   prices: ReadonlyMap<string, number>;
-}): Promise<ManagerClPositionValue[]> {
+}): Promise<{ positions: ManagerClPositionValue[]; hasErrors: boolean }> {
   const price0 = lookupPriceMusd(input.prices, input.pool.token0, input.symbol0);
   const price1 = lookupPriceMusd(input.prices, input.pool.token1, input.symbol1);
 
-  const staked = await input.client.readContract({
-    address: input.pool.gauge,
-    abi: gaugeAbi,
-    functionName: "stakedValues",
-    args: [input.manager],
-  });
-  const stakedIds = new Set(staked.map((id) => id.toString()));
-  const candidateIds = new Set<string>(stakedIds);
-
-  const walletCount = await input.client.readContract({
-    address: ADDRESSES.npm,
-    abi: npmAbi,
-    functionName: "balanceOf",
-    args: [input.manager],
-  });
-  if (walletCount > BigInt(Number.MAX_SAFE_INTEGER)) {
-    throw new Error(`Manager NFT count ${walletCount.toString()} exceeds the safe limit.`);
+  let hasErrors = false;
+  const stakedIds = new Set<string>();
+  const candidateIds = new Set<string>();
+  try {
+    const staked = await input.client.readContract({
+      address: input.pool.gauge,
+      abi: gaugeAbi,
+      functionName: "stakedValues",
+      args: [input.manager],
+    });
+    for (const id of staked) {
+      const idText = id.toString();
+      stakedIds.add(idText);
+      candidateIds.add(idText);
+    }
+  } catch (error) {
+    hasErrors = true;
+    console.error("[admin-report] Failed to read staked manager positions", {
+      manager: input.manager,
+      gauge: input.pool.gauge,
+      error,
+    });
   }
-  for (let index = 0; index < Number(walletCount); index += 1) {
-    const tokenId = await input.client.readContract({
+
+  try {
+    const walletCount = await input.client.readContract({
       address: ADDRESSES.npm,
       abi: npmAbi,
-      functionName: "tokenOfOwnerByIndex",
-      args: [input.manager, BigInt(index)],
+      functionName: "balanceOf",
+      args: [input.manager],
     });
-    candidateIds.add(tokenId.toString());
+    if (walletCount > BigInt(Number.MAX_SAFE_INTEGER)) {
+      throw new Error(`Manager NFT count ${walletCount.toString()} exceeds the safe limit.`);
+    }
+    for (let index = 0; index < Number(walletCount); index += 1) {
+      try {
+        const tokenId = await input.client.readContract({
+          address: ADDRESSES.npm,
+          abi: npmAbi,
+          functionName: "tokenOfOwnerByIndex",
+          args: [input.manager, BigInt(index)],
+        });
+        candidateIds.add(tokenId.toString());
+      } catch (error) {
+        hasErrors = true;
+        console.error("[admin-report] Failed to enumerate manager CL position", {
+          manager: input.manager,
+          index,
+          error,
+        });
+      }
+    }
+  } catch (error) {
+    hasErrors = true;
+    console.error("[admin-report] Failed to read manager CL position count", {
+      manager: input.manager,
+      error,
+    });
   }
 
   const positions: ManagerClPositionValue[] = [];
   for (const idText of candidateIds) {
-    const tokenId = BigInt(idText);
-    const position = await input.client.readContract({
-      address: ADDRESSES.npm,
-      abi: npmAbi,
-      functionName: "positions",
-      args: [tokenId],
-    });
-    if (getAddress(position[2]) !== input.pool.token0) continue;
-    if (getAddress(position[3]) !== input.pool.token1) continue;
-    if (Number(position[4]) !== input.pool.tickSpacing) continue;
-    const liquidity = BigInt(position[7]);
-    if (liquidity === 0n) continue;
+    try {
+      const tokenId = BigInt(idText);
+      const position = await input.client.readContract({
+        address: ADDRESSES.npm,
+        abi: npmAbi,
+        functionName: "positions",
+        args: [tokenId],
+      });
+      if (getAddress(position[2]) !== input.pool.token0) continue;
+      if (getAddress(position[3]) !== input.pool.token1) continue;
+      if (Number(position[4]) !== input.pool.tickSpacing) continue;
+      const liquidity = BigInt(position[7]);
+      if (liquidity === 0n) continue;
 
-    const tickLower = Number(position[5]);
-    const tickUpper = Number(position[6]);
-    const amounts = amountsForLiquidity(input.pool.sqrtPriceX96, tickLower, tickUpper, liquidity);
-    const value0 = valueRawAmountMusd(amounts.amount0, input.decimals0, price0);
-    const value1 = valueRawAmountMusd(amounts.amount1, input.decimals1, price1);
-    const valueMusd = value0 == null && value1 == null ? null : (value0 ?? 0) + (value1 ?? 0);
+      const tickLower = Number(position[5]);
+      const tickUpper = Number(position[6]);
+      const amounts = amountsForLiquidity(input.pool.sqrtPriceX96, tickLower, tickUpper, liquidity);
+      const value0 = valueRawAmountMusd(amounts.amount0, input.decimals0, price0);
+      const value1 = valueRawAmountMusd(amounts.amount1, input.decimals1, price1);
+      const valueMusd = value0 == null && value1 == null ? null : (value0 ?? 0) + (value1 ?? 0);
 
-    positions.push({
-      pair: input.pairLabel,
-      tokenId: idText,
-      staked: stakedIds.has(idText),
-      tickLower,
-      tickUpper,
-      inRange: input.pool.tick >= tickLower && input.pool.tick < tickUpper,
-      amount0: formatUnits(amounts.amount0, input.decimals0),
-      amount1: formatUnits(amounts.amount1, input.decimals1),
-      symbol0: input.symbol0,
-      symbol1: input.symbol1,
-      valueMusd,
-    });
+      positions.push({
+        pair: input.pairLabel,
+        tokenId: idText,
+        staked: stakedIds.has(idText),
+        tickLower,
+        tickUpper,
+        inRange: input.pool.tick >= tickLower && input.pool.tick < tickUpper,
+        amount0: formatUnits(amounts.amount0, input.decimals0),
+        amount1: formatUnits(amounts.amount1, input.decimals1),
+        symbol0: input.symbol0,
+        symbol1: input.symbol1,
+        valueMusd,
+      });
+    } catch (error) {
+      hasErrors = true;
+      console.error("[admin-report] Failed to read manager CL position details", {
+        manager: input.manager,
+        pool: input.pool.address,
+        tokenId: idText,
+        error,
+      });
+    }
   }
 
-  return positions.sort((left, right) => Number(BigInt(left.tokenId) - BigInt(right.tokenId)));
+  return {
+    positions: positions.sort((left, right) => Number(BigInt(left.tokenId) - BigInt(right.tokenId))),
+    hasErrors,
+  };
 }

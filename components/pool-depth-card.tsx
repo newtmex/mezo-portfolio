@@ -41,6 +41,12 @@ export function PoolDepthCard({ report }: { report: ClRangeDepthReport }) {
         </div>
       </div>
 
+      {report.hasPartialErrors ? (
+        <p role="status" className="text-xs text-rose-200">
+          An error occurred while loading some CL data.
+        </p>
+      ) : null}
+
       <div className="h-2 overflow-hidden rounded-full bg-white/5">
         <div
           className="h-full rounded-full bg-gradient-to-r from-amber-400 to-orange-500"

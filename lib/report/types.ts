@@ -43,6 +43,7 @@ export type ClRangeDepthReport = {
     sellToken0ToLeaveLower: DepthSide;
     sellToken1ToLeaveUpper: DepthSide;
   }>;
+  hasPartialErrors: boolean;
 };
 
 export type ManagerTokenHolding = {
@@ -96,4 +97,5 @@ export type ManagerRangeDepthPayload = {
     mezoPerDay: number | null;
     valueMusdPerDay: number | null;
   };
+  hasPartialErrors: boolean;
 };

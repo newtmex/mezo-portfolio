@@ -151,9 +151,14 @@ export async function buildManagerRangeDepthReport(input?: {
 }): Promise<ManagerRangeDepthPayload> {
   const client = input?.client ?? getHttpClient();
   const manager = input?.manager ?? getManagerAddress();
-  const prices = await fetchMezoPriceMapMusd();
+  let hasPartialErrors = false;
+  const prices = await fetchMezoPriceMapMusd().catch((error) => {
+    hasPartialErrors = true;
+    console.error("[admin-report] Failed to fetch token prices", { error });
+    return new Map<string, number>();
+  });
 
-  const pairSnapshots = await Promise.all(
+  const snapshotResults = await Promise.allSettled(
     PAIRS.map(async (pair) => ({
       pair,
       pool: await resolveMostLiquidClPool(
@@ -165,34 +170,66 @@ export async function buildManagerRangeDepthReport(input?: {
       ),
     })),
   );
+  const pairSnapshots = snapshotResults.flatMap((result, index) => {
+    if (result.status === "fulfilled") return [result.value];
+    hasPartialErrors = true;
+    console.error("[admin-report] Failed to resolve pool snapshot", {
+      pair: PAIRS[index].label,
+      error: result.reason,
+    });
+    return [];
+  });
 
-  const latestBlock = await client.getBlock();
+  const latestBlock = await client.getBlock().catch((error) => {
+    hasPartialErrors = true;
+    console.error("[admin-report] Failed to read latest block for emissions", { error });
+    return null;
+  });
   const gaugePools = pairSnapshots.map(({ pool }) => pool).filter((pool) => pool.gauge);
   const aggregateEmissionRates = await Promise.all(
     gaugePools.map((pool) =>
-      readLiveGaugeRewardRate(client, pool.gauge, latestBlock.timestamp).catch(() => 0n),
+      latestBlock
+        ? readLiveGaugeRewardRate(client, pool.gauge, latestBlock.timestamp).catch((error) => {
+            hasPartialErrors = true;
+            console.error("[admin-report] Failed to read gauge reward rate", {
+              gauge: pool.gauge,
+              error,
+            });
+            return 0n;
+          })
+        : Promise.resolve(0n),
     ),
   );
   const annualEmissionValues = await Promise.all(
     gaugePools.map((pool) =>
-      readLiveGaugeAnnualEmissionValue(client, pool.gauge, latestBlock.timestamp, prices).catch(
-        () => null,
-      ),
+      latestBlock
+        ? readLiveGaugeAnnualEmissionValue(client, pool.gauge, latestBlock.timestamp, prices).catch(
+            (error) => {
+              hasPartialErrors = true;
+              console.error("[admin-report] Failed to read annual gauge emissions", {
+                gauge: pool.gauge,
+                error,
+              });
+              return null;
+            },
+          )
+        : Promise.resolve(null),
     ),
   );
 
   const mezoPrice = lookupPriceMusd(prices, TRACKED_TOKENS[1].address, "MEZO");
 
-  const reports = await Promise.all(
+  const reportResults = await Promise.allSettled(
     pairSnapshots.map(async ({ pair, pool }) => {
-      const [report, inRangeLiquidityValueMusd] = await Promise.all([
-        buildClRangeDepthReport({
-          client,
-          pairLabel: pair.label,
-          pool,
-          managerAddress: manager,
-        }),
-        readInRangeLiquidityValueMusd({
+      const report = await buildClRangeDepthReport({
+        client,
+        pairLabel: pair.label,
+        pool,
+        managerAddress: manager,
+      });
+      let inRangeLiquidityValueMusd: number | null = null;
+      try {
+        inRangeLiquidityValueMusd = await readInRangeLiquidityValueMusd({
           client,
           pool: {
             address: pool.address,
@@ -204,8 +241,15 @@ export async function buildManagerRangeDepthReport(input?: {
             liquidity: pool.liquidity,
           },
           prices,
-        }),
-      ]);
+        });
+      } catch (error) {
+        hasPartialErrors = true;
+        console.error("[admin-report] Failed to read in-range liquidity value", {
+          pair: pair.label,
+          pool: pool.address,
+          error,
+        });
+      }
       const gaugeIndex = gaugePools.findIndex(
         (candidate) => candidate.gauge.toLowerCase() === pool.gauge.toLowerCase(),
       );
@@ -216,56 +260,104 @@ export async function buildManagerRangeDepthReport(input?: {
           annualRewardValueMusd: annualRewardValueMusd ?? Number.NaN,
           inRangeLiquidityValueMusd,
         }),
+        hasPartialErrors: report.hasPartialErrors,
       };
     }),
   );
+  const reports = reportResults.flatMap((result, index) => {
+    if (result.status === "fulfilled") {
+      if (result.value.hasPartialErrors) hasPartialErrors = true;
+      return [result.value];
+    }
+    hasPartialErrors = true;
+    console.error("[admin-report] Failed to build pool range-depth report", {
+      pair: pairSnapshots[index].pair.label,
+      pool: pairSnapshots[index].pool.address,
+      error: result.reason,
+    });
+    return [];
+  });
 
-  const mezoPerDay = gaugePools.reduce((total, pool, index) => {
+  const calculatedMezoPerDay = gaugePools.reduce((total, pool, index) => {
     const report = reports.find((candidate) => candidate.gauge === pool.gauge);
     const activeShareBps = report?.managerStakedActiveLiquidityShareBps;
     if (activeShareBps == null) return total;
     const accountRate = (aggregateEmissionRates[index] * BigInt(activeShareBps)) / 10_000n;
     return total + Number(formatUnits(accountRate, 18)) * 86_400;
   }, 0);
-  const [tokenHoldings, ...positionGroups] = await Promise.all([
-    readManagerTokenHoldings({
-      client,
-      manager,
-      tokens: TRACKED_TOKENS.map((token) => ({
-        symbol: token.symbol,
-        address: token.address,
-      })),
-      prices,
-    }),
-    ...pairSnapshots.map(async ({ pair, pool }, index) => {
-      const report = reports[index];
-      const [decimals0, decimals1] = await Promise.all([
-        client.readContract({
-          address: pool.token0,
-          abi: erc20Abi,
-          functionName: "decimals",
-        }),
-        client.readContract({
-          address: pool.token1,
-          abi: erc20Abi,
-          functionName: "decimals",
-        }),
-      ]);
-      return collectManagerPoolPositions({
-        client,
-        pool,
-        pairLabel: pair.label,
-        manager,
-        symbol0: report.token0.symbol,
-        symbol1: report.token1.symbol,
-        decimals0: Number(decimals0),
-        decimals1: Number(decimals1),
-        prices,
-      });
-    }),
+  const mezoPerDay = latestBlock ? calculatedMezoPerDay : null;
+  const tokenHoldingsPromise = readManagerTokenHoldings({
+    client,
+    manager,
+    tokens: TRACKED_TOKENS.map((token) => ({
+      symbol: token.symbol,
+      address: token.address,
+    })),
+    prices,
+  });
+  const positionSnapshots = pairSnapshots.filter(({ pair }) =>
+    reports.some((report) => report.pairLabel === pair.label),
+  );
+  const [tokenHoldingsSettled, positionResults] = await Promise.all([
+    Promise.allSettled([tokenHoldingsPromise]),
+    Promise.allSettled(
+      positionSnapshots.map(async ({ pair, pool }) => {
+        const report = reports.find((candidate) => candidate.pairLabel === pair.label)!;
+        const [decimals0, decimals1] = await Promise.all([
+          client.readContract({
+            address: pool.token0,
+            abi: erc20Abi,
+            functionName: "decimals",
+          }),
+          client.readContract({
+            address: pool.token1,
+            abi: erc20Abi,
+            functionName: "decimals",
+          }),
+        ]);
+        return collectManagerPoolPositions({
+          client,
+          pool,
+          pairLabel: pair.label,
+          manager,
+          symbol0: report.token0.symbol,
+          symbol1: report.token1.symbol,
+          decimals0: Number(decimals0),
+          decimals1: Number(decimals1),
+          prices,
+        });
+      }),
+    ),
   ]);
+  const tokenHoldingsResult = tokenHoldingsSettled[0];
 
-  const clPositions = positionGroups.flat();
+  const tokenHoldings = tokenHoldingsResult.status === "fulfilled"
+    ? tokenHoldingsResult.value.holdings
+    : [];
+  if (tokenHoldingsResult.status === "fulfilled" && tokenHoldingsResult.value.hasErrors) {
+    hasPartialErrors = true;
+  }
+  if (tokenHoldingsResult.status === "rejected") {
+    hasPartialErrors = true;
+    console.error("[admin-report] Failed to read manager token holdings", {
+      manager,
+      error: tokenHoldingsResult.reason,
+    });
+  }
+  const clPositions = positionResults.flatMap((result, index) => {
+    if (result.status === "fulfilled") {
+      if (result.value.hasErrors) hasPartialErrors = true;
+      return result.value.positions;
+    }
+    hasPartialErrors = true;
+    console.error("[admin-report] Failed to read manager positions for pool", {
+      pair: positionSnapshots[index].pair.label,
+      pool: positionSnapshots[index].pool.address,
+      manager,
+      error: result.reason,
+    });
+    return [];
+  });
 
   const tokenTotalMusd = tokenHoldings.reduce(
     (sum, row) =>
@@ -303,10 +395,13 @@ export async function buildManagerRangeDepthReport(input?: {
     summary,
     pools: reports,
     emissions: {
-      mezoPerDay: Number.isFinite(mezoPerDay) ? mezoPerDay : null,
+      mezoPerDay: mezoPerDay != null && Number.isFinite(mezoPerDay) ? mezoPerDay : null,
       valueMusdPerDay:
-        mezoPrice != null && Number.isFinite(mezoPerDay) ? mezoPerDay * mezoPrice : null,
+        mezoPrice != null && mezoPerDay != null && Number.isFinite(mezoPerDay)
+          ? mezoPerDay * mezoPrice
+          : null,
     },
+    hasPartialErrors,
   };
 }
 
@@ -318,7 +413,19 @@ export async function buildPoolRangeDepthReport(
   if (!pair) throw new Error(`Unknown pool key: ${key}`);
   const client = input?.client ?? getHttpClient();
   const manager = input?.manager ?? getManagerAddress();
-  const [prices, latestBlock] = await Promise.all([fetchMezoPriceMapMusd(), client.getBlock()]);
+  let hasPartialErrors = false;
+  const [prices, latestBlock] = await Promise.all([
+    fetchMezoPriceMapMusd().catch((error) => {
+      hasPartialErrors = true;
+      console.error("[admin-report] Failed to fetch token prices", { error });
+      return new Map<string, number>();
+    }),
+    client.getBlock().catch((error) => {
+      hasPartialErrors = true;
+      console.error("[admin-report] Failed to read latest block for emissions", { error });
+      return null;
+    }),
+  ]);
   const pool = await resolveMostLiquidClPool(
     client,
     pair.tokenA,
@@ -328,9 +435,18 @@ export async function buildPoolRangeDepthReport(
   );
   const [report, annualRewardValueMusd, inRangeLiquidityValueMusd] = await Promise.all([
     buildClRangeDepthReport({ client, pairLabel: pair.label, pool, managerAddress: manager }),
-    readLiveGaugeAnnualEmissionValue(client, pool.gauge, latestBlock.timestamp, prices).catch(
-      () => null,
-    ),
+    latestBlock
+      ? readLiveGaugeAnnualEmissionValue(client, pool.gauge, latestBlock.timestamp, prices).catch(
+          (error) => {
+            hasPartialErrors = true;
+            console.error("[admin-report] Failed to read annual gauge emissions", {
+              gauge: pool.gauge,
+              error,
+            });
+            return null;
+          },
+        )
+      : Promise.resolve(null),
     readInRangeLiquidityValueMusd({
       client,
       pool: {
@@ -343,10 +459,19 @@ export async function buildPoolRangeDepthReport(
         liquidity: pool.liquidity,
       },
       prices,
+    }).catch((error) => {
+      hasPartialErrors = true;
+      console.error("[admin-report] Failed to read in-range liquidity value", {
+        pair: pair.label,
+        pool: pool.address,
+        error,
+      });
+      return null;
     }),
   ]);
   return {
     ...report,
+    hasPartialErrors: report.hasPartialErrors || hasPartialErrors,
     activeLiquidityApr: activeLiquidityAprPercent({
       annualRewardValueMusd: annualRewardValueMusd ?? Number.NaN,
       inRangeLiquidityValueMusd,
