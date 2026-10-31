@@ -66,10 +66,8 @@ export const ADDRESSES = {
 export const BASE_ADDRESSES = {
   mezo: getAddress("0x8e4cbbcc33db6c0a18561fde1f6ba35906d4848b"),
   musd: getAddress("0xdd468a1ddc392dcdbef6db6e34e89aa338f9f186"),
-  clFactory: getAddress("0xf8f2eB4940CFE7d13603DDDD87f123820Fc061Ef"),
-  pool: getAddress("0xEF458A3263d2a8C7f3ed9e949aE2F9B345D08b1F"),
-  voter: getAddress("0x16613524e02ad97eDfeF371bC883F2F5d6C480A5"),
-  npm: getAddress("0xe1f8cd9AC4e4A65F54f38a5CdAfCA44f6dD68b53"),
+  // Aero's post-upgrade Slipstream factory on Base.
+  clFactory: getAddress("0x9CB220581b91b0C83223012FE69688b92aD07a76"),
 } as const;
 
 export type PairKey = "musd-avbtcm" | "mezo-musd" | "avbtcm-avmezom" | "mezo-btc" | "musdc-btc";

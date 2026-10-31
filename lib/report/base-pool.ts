@@ -1,6 +1,6 @@
 import { formatUnits, getAddress, type Address, type PublicClient } from "viem";
 
-import { baseGaugeAbi, baseVoterAbi, clFactoryAbi, clPoolAbi, erc20Abi, npmAbi } from "../abis";
+import { baseGaugeAbi, clFactoryAbi, clPoolAbi, erc20Abi, npmAbi } from "../abis";
 import { BASE_ADDRESSES, getManagerAddressOrNull } from "../config";
 import { getBaseHttpClient } from "../clients";
 import {
@@ -21,6 +21,7 @@ export type BasePoolReport = {
   fetchedAt: string;
   pool: Address;
   factory: Address;
+  npm: Address;
   gauge: Address | null;
   manager: Address | null;
   token0: { address: Address; symbol: string; decimals: number };
@@ -75,8 +76,20 @@ export async function buildBasePoolReport(input?: {
   client?: PublicClient;
 }): Promise<BasePoolReport> {
   const client = input?.client ?? getBaseHttpClient();
+  const [factoryPool] = await client.multicall({
+    allowFailure: false,
+    contracts: [{
+      address: BASE_ADDRESSES.clFactory,
+      abi: clFactoryAbi,
+      functionName: "getPool",
+      args: [BASE_ADDRESSES.mezo, BASE_ADDRESSES.musd, BASE_TICK_SPACING],
+    }],
+  });
+  const resolvedPool = getAddress(factoryPool);
+  if (resolvedPool === zeroAddress) {
+    throw new Error("Aero MUSD/MEZO CL200 pool was not found in the configured factory.");
+  }
   const [
-    factoryPool,
     token0,
     token1,
     fee,
@@ -90,28 +103,23 @@ export async function buildBasePoolReport(input?: {
     decimals1,
     balance1,
     gaugeResult,
+    npmResult,
   ] = await client.multicall({
     allowFailure: false,
     contracts: [
-      {
-        address: BASE_ADDRESSES.clFactory,
-        abi: clFactoryAbi,
-        functionName: "getPool",
-        args: [BASE_ADDRESSES.mezo, BASE_ADDRESSES.musd, BASE_TICK_SPACING],
-      },
-      { address: BASE_ADDRESSES.pool, abi: clPoolAbi, functionName: "token0" },
-      { address: BASE_ADDRESSES.pool, abi: clPoolAbi, functionName: "token1" },
-      { address: BASE_ADDRESSES.pool, abi: clPoolAbi, functionName: "fee" },
-      { address: BASE_ADDRESSES.pool, abi: clPoolAbi, functionName: "tickSpacing" },
-      { address: BASE_ADDRESSES.pool, abi: clPoolAbi, functionName: "slot0" },
-      { address: BASE_ADDRESSES.pool, abi: clPoolAbi, functionName: "liquidity" },
+      { address: resolvedPool, abi: clPoolAbi, functionName: "token0" },
+      { address: resolvedPool, abi: clPoolAbi, functionName: "token1" },
+      { address: resolvedPool, abi: clPoolAbi, functionName: "fee" },
+      { address: resolvedPool, abi: clPoolAbi, functionName: "tickSpacing" },
+      { address: resolvedPool, abi: clPoolAbi, functionName: "slot0" },
+      { address: resolvedPool, abi: clPoolAbi, functionName: "liquidity" },
       { address: BASE_ADDRESSES.mezo, abi: erc20Abi, functionName: "symbol" },
       { address: BASE_ADDRESSES.mezo, abi: erc20Abi, functionName: "decimals" },
       {
         address: BASE_ADDRESSES.mezo,
         abi: erc20Abi,
         functionName: "balanceOf",
-        args: [BASE_ADDRESSES.pool],
+        args: [resolvedPool],
       },
       { address: BASE_ADDRESSES.musd, abi: erc20Abi, functionName: "symbol" },
       { address: BASE_ADDRESSES.musd, abi: erc20Abi, functionName: "decimals" },
@@ -119,20 +127,13 @@ export async function buildBasePoolReport(input?: {
         address: BASE_ADDRESSES.musd,
         abi: erc20Abi,
         functionName: "balanceOf",
-        args: [BASE_ADDRESSES.pool],
+        args: [resolvedPool],
       },
-      {
-        address: BASE_ADDRESSES.voter,
-        abi: baseVoterAbi,
-        functionName: "gauges",
-        args: [BASE_ADDRESSES.pool],
-      },
+      { address: resolvedPool, abi: clPoolAbi, functionName: "gauge" },
+      { address: resolvedPool, abi: clPoolAbi, functionName: "nft" },
     ],
   });
-  const resolvedPool = getAddress(factoryPool);
-  if (resolvedPool !== BASE_ADDRESSES.pool) {
-    throw new Error(`Unexpected Base MUSD/MEZO pool: ${resolvedPool}`);
-  }
+  const npm = getAddress(npmResult);
   const normalizedToken0 = getAddress(token0);
   const normalizedToken1 = getAddress(token1);
   if (normalizedToken0 !== BASE_ADDRESSES.mezo || normalizedToken1 !== BASE_ADDRESSES.musd) {
@@ -179,7 +180,7 @@ export async function buildBasePoolReport(input?: {
       const positions = await client.multicall({
         allowFailure: false,
         contracts: stakedIds.map((tokenId) => ({
-          address: BASE_ADDRESSES.npm,
+          address: npm,
           abi: npmAbi,
           functionName: "positions" as const,
           args: [BigInt(tokenId)] as const,
@@ -274,7 +275,7 @@ export async function buildBasePoolReport(input?: {
         }
       }
     } catch {
-      // Reward-rate methods are not implemented by every Aerodrome gauge.
+      // Reward-rate methods are not implemented by every Aero gauge.
     }
   }
   return {
@@ -283,6 +284,7 @@ export async function buildBasePoolReport(input?: {
     fetchedAt: new Date().toISOString(),
     pool: resolvedPool,
     factory: BASE_ADDRESSES.clFactory,
+    npm,
     gauge: gauge === zeroAddress ? null : gauge,
     manager,
     token0: {

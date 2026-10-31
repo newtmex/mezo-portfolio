@@ -1,6 +1,6 @@
 # Portfolio Dashboard — Range Depth
 
-Standalone Next.js dashboard for monitoring a Mezo mainnet portfolio across concentrated-liquidity pools, plus the Base Aerodrome MUSD/MEZO pool.
+Standalone Next.js dashboard for monitoring a Mezo mainnet portfolio across concentrated-liquidity pools, plus the Base Aero MUSD/MEZO pool.
 
 It displays portfolio totals, token balances, CL positions, pool range depth, active-liquidity share, per-pool active-liquidity APR, price-move depth, and recent on-chain activity.
 
@@ -10,10 +10,10 @@ It displays portfolio totals, token balances, CL positions, pool range depth, ac
 - Calculates each pool's active-liquidity APR from the USD value of live MEZO/AERO gauge emissions divided by the USD value of current in-range liquidity.
 - Shows token balances and CL positions in portfolio dropdowns beside the wallet address.
 - Keeps live activity hidden by default in a foldable right-side panel.
-- Does not poll automatically. Data refreshes after watched on-chain events, including Mezo swaps, liquidity changes, token transfers, NFT transfers, gauge deposits/withdrawals, and Aerodrome Base pool swaps, liquidity changes, and manager gauge deposits/withdrawals.
-- Refreshes the affected Mezo pool and portfolio valuation after pool events; wallet and position events refresh the portfolio report. Aerodrome Base pool, gauge, and manager activity refreshes the Base report and its displayed update time.
+- Does not poll automatically. Data refreshes after watched on-chain events, including Mezo swaps, liquidity changes, token transfers, NFT transfers, gauge deposits/withdrawals, and Aero Base pool swaps, liquidity changes, and manager gauge deposits/withdrawals.
+- Refreshes the affected Mezo pool and portfolio valuation after pool events; wallet and position events refresh the portfolio report. Aero Base pool, gauge, and manager activity refreshes the Base report and its displayed update time.
 - Uses Mezo API prices for standard tokens and derives `avBTCm`/`avMEZOm` prices from the configured Aurove CL pools when the API does not provide wrapper prices.
-- Tracks the Base Aerodrome Slipstream MUSD/MEZO CL200 pool independently of the Mezo portfolio report; Base pool reads do not block Mezo dashboard data.
+- Tracks the Base Aero Slipstream MUSD/MEZO CL200 pool independently of the Mezo portfolio report. The pool, gauge, and position manager are resolved from Aero's factory and pool; Base pool reads do not block Mezo dashboard data.
 
 ## Stack
 
@@ -46,7 +46,7 @@ Open [http://127.0.0.1:3001](http://127.0.0.1:3001).
 | `MEZO_RPC_WSS` / `NEXT_PUBLIC_MEZO_RPC_WSS`   | Mezo WebSocket endpoint for live events           |
 | `BASE_RPC_HTTP` / `NEXT_PUBLIC_BASE_RPC_HTTP` | Primary Base HTTPS JSON-RPC endpoint              |
 | `BASE_RPC_HTTP_FALLBACKS`                     | Comma-separated Base RPC fallback endpoints       |
-| `BASE_RPC_WSS` / `NEXT_PUBLIC_BASE_RPC_WSS`   | Base WebSocket endpoint for Aerodrome live events |
+| `BASE_RPC_WSS` / `NEXT_PUBLIC_BASE_RPC_WSS`   | Base WebSocket endpoint for Aero live events      |
 | `MEZO_POOLS_API_BASE_URL`                     | Optional Mezo pools API base URL override         |
 | `MEZO_API_BASE_URL`                           | Optional Mezo API base URL override               |
 | `NEXT_PUBLIC_MEZO_API_BASE_URL`               | Optional browser-visible API base URL override    |

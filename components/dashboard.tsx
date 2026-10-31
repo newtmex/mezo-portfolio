@@ -147,7 +147,7 @@ export function Dashboard() {
         void queryClient.invalidateQueries({ queryKey: ["range-depth"] });
         return;
       }
-      if (source === "Aerodrome MUSD/MEZO") {
+      if (source === "Aero MUSD/MEZO") {
         void queryClient.invalidateQueries({ queryKey: ["base-pool"] });
         return;
       }
@@ -183,27 +183,41 @@ export function Dashboard() {
 
   useEffect(() => {
     if (!manager || !basePoolQuery.data) return;
-    const handle = startBasePoolEventWatchers(manager, basePoolQuery.data.gauge, {
-      onEvent: (event) => {
-        if (alertsEnabled) {
-          if (volume > 0) playUpdateSound(volume);
-          if ("Notification" in window && Notification.permission === "granted") {
-            new Notification(`Portfolio update · ${event.kind}`, {
-              body: `${event.source}: ${event.summary}`,
-              tag: event.id,
-            });
+    const handle = startBasePoolEventWatchers(
+      manager,
+      basePoolQuery.data.gauge,
+      basePoolQuery.data.pool,
+      basePoolQuery.data.npm,
+      {
+        onEvent: (event) => {
+          if (alertsEnabled) {
+            if (volume > 0) playUpdateSound(volume);
+            if ("Notification" in window && Notification.permission === "granted") {
+              new Notification(`Portfolio update · ${event.kind}`, {
+                body: `${event.source}: ${event.summary}`,
+                tag: event.id,
+              });
+            }
           }
-        }
-        setEvents((prev) => {
-          if (prev.some((row) => row.id === event.id)) return prev;
-          return [event, ...prev].slice(0, 50);
-        });
+          setEvents((prev) => {
+            if (prev.some((row) => row.id === event.id)) return prev;
+            return [event, ...prev].slice(0, 50);
+          });
+        },
+        onState: setBaseWsState,
+        onRefreshNeeded,
       },
-      onState: setBaseWsState,
-      onRefreshNeeded,
-    });
+    );
     return () => handle.stop();
-  }, [alertsEnabled, basePoolQuery.data?.gauge, manager, onRefreshNeeded, volume]);
+  }, [
+    alertsEnabled,
+    basePoolQuery.data?.gauge,
+    basePoolQuery.data?.pool,
+    basePoolQuery.data?.npm,
+    manager,
+    onRefreshNeeded,
+    volume,
+  ]);
 
   if (query.isLoading && !query.data && poolQueries.every((pool) => pool.isLoading)) {
     return (

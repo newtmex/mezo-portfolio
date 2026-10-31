@@ -277,17 +277,19 @@ export function startManagerEventWatchers(
   };
 }
 
-/** Subscribe to the Aerodrome Slipstream pool and manager gauge events over Base WSS. */
+/** Subscribe to the Aero Slipstream pool and manager gauge events over Base WSS. */
 export function startBasePoolEventWatchers(
   manager: Address,
   gauge: Address | null,
+  pool: Address,
+  npm: Address,
   handlers: WatchHandlers,
 ): EventWatcherHandle {
   const client: PublicClient = createBaseWsClient();
   const unsubscribers: Array<() => void> = [];
   let stopped = false;
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
-  const source = "Aerodrome MUSD/MEZO";
+  const source = "Aero MUSD/MEZO";
   const refresh = () => {
     if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
@@ -304,7 +306,7 @@ export function startBasePoolEventWatchers(
   };
   const watch = (event: typeof poolSwapEvent | typeof poolMintEvent | typeof poolBurnEvent) => {
     unsubscribers.push(client.watchEvent({
-      address: BASE_ADDRESSES.pool,
+      address: pool,
       event,
       onLogs: (logs) => {
         handlers.onState("connected");
@@ -341,14 +343,14 @@ export function startBasePoolEventWatchers(
   }
 
   unsubscribers.push(client.watchEvent<typeof nftTransferEvent>({
-    address: BASE_ADDRESSES.npm,
+    address: npm,
     event: nftTransferEvent,
     args: { from: manager },
     onLogs: onLogs("Transfer", "Manager transferred out a Base position NFT"),
     onError: () => handlers.onState("reconnecting"),
   }));
   unsubscribers.push(client.watchEvent<typeof nftTransferEvent>({
-    address: BASE_ADDRESSES.npm,
+    address: npm,
     event: nftTransferEvent,
     args: { to: manager },
     onLogs: onLogs("Transfer", "Manager received a Base position NFT"),

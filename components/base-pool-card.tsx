@@ -9,7 +9,7 @@ export function BasePoolCard({ report }: { report: BasePoolReport }) {
         <div>
           <h3 className="text-lg font-semibold text-zinc-50">{report.pairLabel}</h3>
           <p className="mt-1 font-mono text-[11px] text-zinc-500">
-            Base · Aerodrome Slipstream · {shortenAddress(report.pool, 5)}
+            Base · Aero Slipstream · {shortenAddress(report.pool, 5)}
           </p>
           <p className="mt-1 text-[10px] text-zinc-500">
             Updated {new Date(report.fetchedAt).toLocaleTimeString()}

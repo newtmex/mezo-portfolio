@@ -104,6 +104,13 @@ export const clPoolAbi = [
   },
   {
     type: "function",
+    name: "nft",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+  },
+  {
+    type: "function",
     name: "slot0",
     stateMutability: "view",
     inputs: [],
