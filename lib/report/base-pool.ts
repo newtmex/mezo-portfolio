@@ -1,13 +1,9 @@
 import { formatUnits, getAddress, type Address, type PublicClient } from "viem";
 
-import { baseGaugeAbi, clFactoryAbi, clPoolAbi, erc20Abi, npmAbi } from "../abis";
+import { baseGaugeAbi, baseLeafVoterAbi, clFactoryAbi, clPoolAbi, erc20Abi, npmAbi } from "../abis";
 import { BASE_ADDRESSES, getManagerAddressOrNull } from "../config";
 import { getBaseHttpClient } from "../clients";
-import {
-  amount0InToReachSqrt,
-  amount1InToReachSqrt,
-  managerActiveShareBps,
-} from "../math/depth";
+import { amount0InToReachSqrt, amount1InToReachSqrt, managerActiveShareBps } from "../math/depth";
 import { amountsForLiquidity } from "../math/amounts";
 import { humanPriceToken1PerToken0 } from "../math/price";
 import { sqrtRatioAtTick, tightestRange } from "../math/tick-math";
@@ -78,12 +74,14 @@ export async function buildBasePoolReport(input?: {
   const client = input?.client ?? getBaseHttpClient();
   const [factoryPool] = await client.multicall({
     allowFailure: false,
-    contracts: [{
-      address: BASE_ADDRESSES.clFactory,
-      abi: clFactoryAbi,
-      functionName: "getPool",
-      args: [BASE_ADDRESSES.mezo, BASE_ADDRESSES.musd, BASE_TICK_SPACING],
-    }],
+    contracts: [
+      {
+        address: BASE_ADDRESSES.clFactory,
+        abi: clFactoryAbi,
+        functionName: "getPool",
+        args: [BASE_ADDRESSES.mezo, BASE_ADDRESSES.musd, BASE_TICK_SPACING],
+      },
+    ],
   });
   const resolvedPool = getAddress(factoryPool);
   if (resolvedPool === zeroAddress) {
@@ -96,6 +94,7 @@ export async function buildBasePoolReport(input?: {
     tickSpacing,
     slot0,
     liquidity,
+    stakedLiquidity,
     symbol0,
     decimals0,
     balance0,
@@ -113,6 +112,7 @@ export async function buildBasePoolReport(input?: {
       { address: resolvedPool, abi: clPoolAbi, functionName: "tickSpacing" },
       { address: resolvedPool, abi: clPoolAbi, functionName: "slot0" },
       { address: resolvedPool, abi: clPoolAbi, functionName: "liquidity" },
+      { address: resolvedPool, abi: clPoolAbi, functionName: "stakedLiquidity" },
       { address: BASE_ADDRESSES.mezo, abi: erc20Abi, functionName: "symbol" },
       { address: BASE_ADDRESSES.mezo, abi: erc20Abi, functionName: "decimals" },
       {
@@ -224,6 +224,7 @@ export async function buildBasePoolReport(input?: {
     balance: BigInt(balance1),
   };
   const poolLiquidity = BigInt(liquidity);
+  const poolStakedLiquidity = BigInt(stakedLiquidity);
   const feeRaw = BigInt(fee);
   const range = tightestRange(tick, Number(tickSpacing));
   const sqrtPriceX96 = BigInt(slot0[0]);
@@ -235,47 +236,68 @@ export async function buildBasePoolReport(input?: {
       : 0n;
   const sqrtPrice = Number(sqrtPriceX96) / Number(1n << 96n);
   const musdPerMezo = sqrtPrice ** 2 * 10 ** (metadata0.decimals - metadata1.decimals);
-  const managerStakedPositionValueUsd = managerStakedLiquidity > 0n
-    ? Number(formatUnits(managerPositionAmount1, metadata1.decimals)) +
-      Number(formatUnits(managerPositionAmount0, metadata0.decimals)) * musdPerMezo
-    : null;
+  const managerStakedPositionValueUsd =
+    managerStakedLiquidity > 0n
+      ? Number(formatUnits(managerPositionAmount1, metadata1.decimals)) +
+        Number(formatUnits(managerPositionAmount0, metadata0.decimals)) * musdPerMezo
+      : null;
   let aeroPerDay: number | null = null;
   let aeroValueUsdPerDay: number | null = null;
-  if (gauge !== zeroAddress && manager && poolLiquidity > 0n) {
+  if (gauge !== zeroAddress && manager) {
     try {
-      const [rewardRate, periodFinish, rewardToken] = await client.multicall({
-        allowFailure: false,
-        contracts: [
-          { address: gauge, abi: baseGaugeAbi, functionName: "rewardRate" },
-          { address: gauge, abi: baseGaugeAbi, functionName: "periodFinish" },
-          { address: gauge, abi: baseGaugeAbi, functionName: "rewardToken" },
-        ],
-      });
-      const [rewardDecimals, rewardSymbol] = await client.multicall({
-        allowFailure: false,
-        contracts: [
-          { address: getAddress(rewardToken), abi: erc20Abi, functionName: "decimals" },
-          { address: getAddress(rewardToken), abi: erc20Abi, functionName: "symbol" },
-        ],
-      });
-      if (rewardSymbol.toUpperCase() === "AERO" && BigInt(periodFinish) > BigInt(Math.floor(Date.now() / 1000))) {
-        const managerShare = Number(managerStakedActiveLiquidity) / Number(poolLiquidity);
-        aeroPerDay = Number(formatUnits(BigInt(rewardRate), Number(rewardDecimals))) * 86_400 * managerShare;
+      const [voter, block] = await Promise.all([
+        client.readContract({ address: gauge, abi: baseGaugeAbi, functionName: "voter" }),
+        client.getBlock(),
+      ]);
+      const [lastCumulativeRewardShare, projectedCumulativeRewardShare, gaugeState] =
+        await client.multicall({
+          allowFailure: false,
+          contracts: [
+            { address: gauge, abi: baseGaugeAbi, functionName: "lastCumulativeRewardShare" },
+            {
+              address: getAddress(voter),
+              abi: baseLeafVoterAbi,
+              functionName: "projectedCumulativeRewardShare",
+              args: [gauge],
+            },
+            {
+              address: getAddress(voter),
+              abi: baseLeafVoterAbi,
+              functionName: "gaugeStates",
+              args: [gauge],
+            },
+          ],
+        });
+      const lastSettlement = BigInt(gaugeState[2]);
+      const elapsed = BigInt(block.timestamp) - lastSettlement;
+      aeroPerDay = 0;
+      aeroValueUsdPerDay = 0;
+      if (elapsed > 0n && poolStakedLiquidity > 0n && managerStakedActiveLiquidity > 0n) {
+        const projected = BigInt(projectedCumulativeRewardShare);
+        const settled = BigInt(lastCumulativeRewardShare);
+        const newlyAccrued = projected > settled ? projected - settled : 0n;
+        const gaugeAeroPerDay = Number(formatUnits(newlyAccrued, 18)) * (86_400 / Number(elapsed));
+        const managerShare = Number(managerStakedActiveLiquidity) / Number(poolStakedLiquidity);
+        aeroPerDay = gaugeAeroPerDay * managerShare;
+
         try {
-          const response = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=aerodrome-finance&vs_currencies=usd", {
-            next: { revalidate: 300 },
-          });
+          const response = await fetch(
+            "https://api.coingecko.com/api/v3/simple/price?ids=aero&vs_currencies=usd",
+            { next: { revalidate: 300 } },
+          );
           if (response.ok) {
-            const body = (await response.json()) as { "aerodrome-finance"?: { usd?: number } };
-            const price = body["aerodrome-finance"]?.usd;
-            if (typeof price === "number" && Number.isFinite(price)) aeroValueUsdPerDay = aeroPerDay * price;
+            const body = (await response.json()) as { aero?: { usd?: number } };
+            const price = body.aero?.usd;
+            if (typeof price === "number" && Number.isFinite(price)) {
+              aeroValueUsdPerDay = aeroPerDay * price;
+            }
           }
         } catch {
-          // Keep the on-chain token amount available when the spot price API is unavailable.
+          // Keep the on-chain token amount available when the price API is unavailable.
         }
       }
-    } catch {
-      // Reward-rate methods are not implemented by every Aero gauge.
+    } catch (error) {
+      console.error("[admin-report] Failed to read Aero gauge emissions", { gauge, error });
     }
   }
   return {
@@ -311,10 +333,8 @@ export async function buildBasePoolReport(input?: {
     activeLiquidityWithoutManager: liquidityWithoutPortfolio.toString(),
     managerStakedLiquidity: managerStakedLiquidity.toString(),
     managerStakedActiveLiquidity: managerStakedActiveLiquidity.toString(),
-    managerStakedActiveLiquidityShareBps: managerActiveShareBps(
-      managerStakedActiveLiquidity,
-      poolLiquidity,
-    )?.toString() ?? null,
+    managerStakedActiveLiquidityShareBps:
+      managerActiveShareBps(managerStakedActiveLiquidity, poolLiquidity)?.toString() ?? null,
     aeroPerDay,
     aeroValueUsdPerDay,
     managerStakedPositionValueUsd:

@@ -334,24 +334,17 @@ export const baseVoterAbi = [
 export const baseGaugeAbi = [
   {
     type: "function",
-    name: "rewardRate",
-    stateMutability: "view",
-    inputs: [],
-    outputs: [{ name: "", type: "uint256" }],
-  },
-  {
-    type: "function",
-    name: "periodFinish",
-    stateMutability: "view",
-    inputs: [],
-    outputs: [{ name: "", type: "uint256" }],
-  },
-  {
-    type: "function",
-    name: "rewardToken",
+    name: "voter",
     stateMutability: "view",
     inputs: [],
     outputs: [{ name: "", type: "address" }],
+  },
+  {
+    type: "function",
+    name: "lastCumulativeRewardShare",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
   },
   {
     type: "function",
@@ -369,5 +362,41 @@ export const baseGaugeAbi = [
       { name: "index", type: "uint256" },
     ],
     outputs: [{ name: "", type: "uint256" }],
+  },
+] as const;
+
+export const baseLeafVoterAbi = [
+  {
+    type: "function",
+    name: "projectedCumulativeRewardShare",
+    stateMutability: "view",
+    inputs: [{ name: "gauge", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "gaugeStates",
+    stateMutability: "view",
+    inputs: [{ name: "gauge", type: "address" }],
+    outputs: [
+      { name: "ceiling", type: "uint128" },
+      { name: "claimed", type: "uint128" },
+      { name: "lastSettlement", type: "uint48" },
+      { name: "registered", type: "bool" },
+      { name: "activated", type: "bool" },
+      { name: "surplus", type: "uint128" },
+      { name: "lastIndex", type: "uint256" },
+      { name: "lastTimeIndex", type: "uint256" },
+      {
+        name: "point",
+        type: "tuple",
+        components: [
+          { name: "bias", type: "int128" },
+          { name: "slope", type: "int128" },
+          { name: "ts", type: "uint48" },
+          { name: "permanentStakeBalance", type: "uint128" },
+        ],
+      },
+    ],
   },
 ] as const;

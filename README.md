@@ -7,13 +7,14 @@ It displays portfolio totals, token balances, CL positions, pool range depth, ac
 ## Behavior
 
 - Covers `mUSDC/BTC`, `MUSD/avBTCm`, `MEZO/MUSD`, `MEZO/BTC`, and `avBTCm/avMEZOm`.
-- Calculates each pool's active-liquidity APR from the USD value of live MEZO/AERO gauge emissions divided by the USD value of current in-range liquidity.
+- Calculates Mezo pool APR from live MEZO gauge emission rates and estimates the Base Aero portfolio's AERO per day from the new gauge's projected cumulative reward share and the manager's share of active staked liquidity.
 - Shows token balances and CL positions in portfolio dropdowns beside the wallet address.
 - Keeps live activity hidden by default in a foldable right-side panel.
 - Does not poll automatically. Data refreshes after watched on-chain events, including Mezo swaps, liquidity changes, token transfers, NFT transfers, gauge deposits/withdrawals, and Aero Base pool swaps, liquidity changes, and manager gauge deposits/withdrawals.
 - Refreshes the affected Mezo pool and portfolio valuation after pool events; wallet and position events refresh the portfolio report. Aero Base pool, gauge, and manager activity refreshes the Base report and its displayed update time.
 - Uses Mezo API prices for standard tokens and derives `avBTCm`/`avMEZOm` prices from the configured Aurove CL pools when the API does not provide wrapper prices.
 - Tracks the Base Aero Slipstream MUSD/MEZO CL200 pool independently of the Mezo portfolio report. The pool, gauge, and position manager are resolved from Aero's factory and pool; Base pool reads do not block Mezo dashboard data.
+- Reads new Aero CL gauge emissions through its LeafVoter projection and settlement state. The displayed AERO/day is an estimate based on the average projected accrual since the gauge's last settlement; it does not use the legacy Aerodrome `rewardRate` and `periodFinish` interface.
 
 ## Stack
 
