@@ -26,7 +26,7 @@ export function BasePoolCard({ report }: { report: BasePoolReport }) {
               rows={report.positions}
               total={positionsTotal ?? report.managerStakedPositionValueUsd}
               title={`${report.pairLabel} CL positions`}
-              subtitle="Staked Aerodrome Slipstream NFTs"
+              subtitle="Staked Aero Slipstream NFTs"
               currentTick={report.tick}
               currentPrice={report.priceToken1PerToken0}
               priceUnit={priceUnit}
