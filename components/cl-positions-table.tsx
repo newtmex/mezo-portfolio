@@ -1,3 +1,4 @@
+import { PriceRangeLine } from "@/components/price-range-line";
 import type { ManagerClPositionValue } from "@/lib/report/types";
 import { humanPriceToken1PerToken0 } from "@/lib/math/price";
 import { sqrtRatioAtTick } from "@/lib/math/tick-math";
@@ -24,6 +25,7 @@ export function ClPositionsTable({
   priceUnit,
   decimals0,
   decimals1,
+  accent = "amber",
 }: {
   rows: ManagerClPositionValue[];
   total: number | null;
@@ -35,6 +37,7 @@ export function ClPositionsTable({
   priceUnit?: string;
   decimals0?: number;
   decimals1?: number;
+  accent?: "amber" | "sky";
 }) {
   const canPriceRange =
     typeof decimals0 === "number" &&
@@ -74,7 +77,7 @@ export function ClPositionsTable({
               <tr className="border-b border-white/10">
                 <th className="px-2 py-2 font-medium">NFT</th>
                 <th className="px-2 py-2 font-medium">Staked</th>
-                <th className="px-2 py-2 font-medium">Range</th>
+                <th className="min-w-[14rem] px-2 py-2 font-medium">Range</th>
                 <th className="px-2 py-2 font-medium">In range</th>
                 <th className="px-2 py-2 font-medium">Token0</th>
                 <th className="px-2 py-2 font-medium">Token1</th>
@@ -106,14 +109,21 @@ export function ClPositionsTable({
                         {row.staked ? "yes" : "no"}
                       </span>
                     </td>
-                    <td className="px-2 py-2.5 font-mono text-xs">
-                      <div>[{row.tickLower}, {row.tickUpper})</div>
+                    <td className="px-2 py-2.5">
                       {priceLower != null && priceUpper != null ? (
-                        <div className="mt-0.5 text-zinc-500">
-                          {formatPrice(priceLower)} → {formatPrice(priceUpper)}
-                          {priceUnit ? ` ${priceUnit}` : ""}
-                        </div>
-                      ) : null}
+                        <PriceRangeLine
+                          rangeLower={priceLower}
+                          rangeUpper={priceUpper}
+                          currentPrice={currentPrice}
+                          priceUnit={priceUnit}
+                          accent={accent}
+                          compact
+                        />
+                      ) : (
+                        <span className="font-mono text-xs">
+                          [{row.tickLower}, {row.tickUpper})
+                        </span>
+                      )}
                     </td>
                     <td className="px-2 py-2.5">
                       <span className={row.inRange ? "text-emerald-300" : "text-rose-300"}>

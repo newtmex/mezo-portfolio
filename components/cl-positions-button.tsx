@@ -53,7 +53,7 @@ export function ClPositionsButton({
         <DropdownMenu.Content
           align="end"
           sideOffset={8}
-          className="z-50 w-[min(92vw,44rem)] rounded-2xl border border-white/10 bg-zinc-950 p-2 shadow-2xl outline-none"
+          className="z-50 w-[min(96vw,52rem)] rounded-2xl border border-white/10 bg-zinc-950 p-2 shadow-2xl outline-none"
         >
           <ClPositionsTable
             rows={rows}
@@ -65,6 +65,7 @@ export function ClPositionsButton({
             priceUnit={priceUnit}
             decimals0={decimals0}
             decimals1={decimals1}
+            accent={accent}
           />
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
