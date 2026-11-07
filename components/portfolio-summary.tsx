@@ -1,4 +1,4 @@
-import { formatUsd } from "@/lib/utils";
+import { formatAmount, formatUsd } from "@/lib/utils";
 import type { ManagerRangeDepthPayload } from "@/lib/report/types";
 
 function Kpi({
@@ -19,19 +19,16 @@ function Kpi({
   );
 }
 
-export function PortfolioSummary({ data }: { data: ManagerRangeDepthPayload }) {
-  const avgShare =
-    data.summary.length === 0
-      ? "n/a"
-      : (() => {
-          const bps = data.summary
-            .map((row) => (row.managerActiveBps == null ? null : Number(row.managerActiveBps)))
-            .filter((v): v is number => v != null && Number.isFinite(v));
-          if (bps.length === 0) return "n/a";
-          const avg = bps.reduce((a, b) => a + b, 0) / bps.length;
-          return `${(avg / 100).toFixed(2)}%`;
-        })();
-
+export function PortfolioSummary({
+  data,
+  aero,
+}: {
+  data: ManagerRangeDepthPayload;
+  aero?: {
+    aeroPerDay: number | null;
+    aeroValueUsdPerDay: number | null;
+  } | null;
+}) {
   return (
     <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
       <Kpi
@@ -41,7 +38,11 @@ export function PortfolioSummary({ data }: { data: ManagerRangeDepthPayload }) {
       />
       <Kpi label="Token balances" value={formatUsd(data.holdings.tokenTotalMusd)} />
       <Kpi label="CL positions" value={formatUsd(data.holdings.clTotalMusd)} />
-      <Kpi label="Avg portfolio active %" value={avgShare} hint="Across all pools" />
+      <Kpi
+        label="AERO emissions / day"
+        value={aero?.aeroPerDay == null ? "n/a" : `${formatAmount(aero.aeroPerDay, 5)} AERO`}
+        hint={`${formatUsd(aero?.aeroValueUsdPerDay ?? null)} / day · Base MUSD/MEZO`}
+      />
       <Kpi
         label="MEZO emissions / day"
         value={data.emissions.mezoPerDay == null ? "n/a" : `${data.emissions.mezoPerDay.toFixed(2)} MEZO`}

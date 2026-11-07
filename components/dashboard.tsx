@@ -7,7 +7,6 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { formatUsd } from "@/lib/utils";
 import { getAddress, isAddress } from "viem";
 
-import { ClPositionsTable } from "@/components/cl-positions-table";
 import { BasePoolCard } from "@/components/base-pool-card";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { LiveEventFeed } from "@/components/live-event-feed";
@@ -17,7 +16,7 @@ import { TokenHoldingsTable } from "@/components/token-holdings-table";
 import type { LiveEventItem, WsConnectionState } from "@/lib/events/types";
 import { startBasePoolEventWatchers, startManagerEventWatchers } from "@/lib/events/watchers";
 import { PAIRS } from "@/lib/config";
-import type { ClRangeDepthReport } from "@/lib/report/types";
+import type { ClRangeDepthReport, ManagerClPositionValue } from "@/lib/report/types";
 import type { BasePoolReport } from "@/lib/report/base-pool";
 
 async function fetchRangeDepth() {
@@ -366,28 +365,6 @@ export function Dashboard() {
                   </DropdownMenu.Content>
                 </DropdownMenu.Portal>
               </DropdownMenu.Root>
-              <DropdownMenu.Root>
-                <DropdownMenu.Trigger asChild>
-                  <button
-                    type="button"
-                    className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-zinc-200 transition hover:bg-white/10"
-                  >
-                    CL {formatUsd(data.holdings.clTotalMusd)}
-                  </button>
-                </DropdownMenu.Trigger>
-                <DropdownMenu.Portal>
-                  <DropdownMenu.Content
-                    align="end"
-                    sideOffset={8}
-                    className="z-50 w-[min(90vw,64rem)] rounded-2xl border border-white/10 bg-zinc-950 p-2 shadow-2xl outline-none"
-                  >
-                    <ClPositionsTable
-                      rows={data.holdings.clPositions}
-                      total={data.holdings.clTotalMusd}
-                    />
-                  </DropdownMenu.Content>
-                </DropdownMenu.Portal>
-              </DropdownMenu.Root>
             </>
           ) : null
         }
@@ -407,7 +384,19 @@ export function Dashboard() {
         </div>
       ) : null}
 
-      {data ? <PortfolioSummary data={data} /> : null}
+      {data ? (
+        <PortfolioSummary
+          data={data}
+          aero={
+            basePoolQuery.data
+              ? {
+                  aeroPerDay: basePoolQuery.data.aeroPerDay,
+                  aeroValueUsdPerDay: basePoolQuery.data.aeroValueUsdPerDay,
+                }
+              : null
+          }
+        />
+      ) : null}
 
       <section className="grid gap-4 xl:grid-cols-3">
         {basePoolQuery.data ? (
@@ -424,7 +413,15 @@ export function Dashboard() {
         )}
         {PAIRS.map((pair, index) =>
           poolQueries[index].data ? (
-            <PoolDepthCard key={pair.key} report={poolQueries[index].data} />
+            <PoolDepthCard
+              key={pair.key}
+              report={poolQueries[index].data}
+              positions={
+                ((data?.holdings.clPositions ?? []) as ManagerClPositionValue[]).filter(
+                  (position) => position.pair === poolQueries[index].data!.pairLabel,
+                )
+              }
+            />
           ) : poolQueries[index].isError ? (
             <div
               key={pair.key}

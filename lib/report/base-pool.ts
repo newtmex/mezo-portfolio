@@ -7,6 +7,7 @@ import { amount0InToReachSqrt, amount1InToReachSqrt, managerActiveShareBps } fro
 import { amountsForLiquidity } from "../math/amounts";
 import { humanPriceToken1PerToken0 } from "../math/price";
 import { sqrtRatioAtTick, tightestRange } from "../math/tick-math";
+import type { ManagerClPositionValue } from "./types";
 import { zeroAddress } from "viem";
 
 const BASE_TICK_SPACING = 200;
@@ -38,6 +39,7 @@ export type BasePoolReport = {
   aeroValueUsdPerDay: number | null;
   managerStakedPositionValueUsd: number | null;
   managerStakedTokenIds: string[];
+  positions: ManagerClPositionValue[];
   priceMoveDepth: {
     withPortfolio: { token0ToLower: string; token1ToUpper: string };
     withoutPortfolio: { token0ToLower: string; token1ToUpper: string };
@@ -154,6 +156,13 @@ export async function buildBasePoolReport(input?: {
   let managerStakedActiveLiquidity = 0n;
   let managerPositionAmount0 = 0n;
   let managerPositionAmount1 = 0n;
+  const clPositions: ManagerClPositionValue[] = [];
+  const sqrtPriceX96 = BigInt(slot0[0]);
+  const musdPerMezo = humanPriceToken1PerToken0(
+    sqrtPriceX96,
+    Number(decimals0),
+    Number(decimals1),
+  );
   if (manager && gauge !== zeroAddress) {
     const [stakedLength] = await client.multicall({
       allowFailure: false,
@@ -177,7 +186,7 @@ export async function buildBasePoolReport(input?: {
           args: [manager, BigInt(index)] as const,
         })),
       });
-      const positions = await client.multicall({
+      const npmPositions = await client.multicall({
         allowFailure: false,
         contracts: stakedIds.map((tokenId) => ({
           address: npm,
@@ -187,25 +196,43 @@ export async function buildBasePoolReport(input?: {
         })),
       });
       managerStakedTokenIds = stakedIds.map((tokenId) => BigInt(tokenId).toString());
-      for (const position of positions) {
+      for (let index = 0; index < npmPositions.length; index += 1) {
+        const position = npmPositions[index]!;
         if (
           getAddress(position[2]) === BASE_ADDRESSES.mezo &&
           getAddress(position[3]) === BASE_ADDRESSES.musd &&
           Number(position[4]) === BASE_TICK_SPACING
         ) {
           const positionLiquidity = BigInt(position[7]);
+          const tickLower = Number(position[5]);
+          const tickUpper = Number(position[6]);
           managerStakedLiquidity += positionLiquidity;
-          const amounts = amountsForLiquidity(
-            BigInt(slot0[0]),
-            Number(position[5]),
-            Number(position[6]),
-            positionLiquidity,
-          );
+          const amounts = amountsForLiquidity(sqrtPriceX96, tickLower, tickUpper, positionLiquidity);
           managerPositionAmount0 += amounts.amount0;
           managerPositionAmount1 += amounts.amount1;
-          if (tick >= Number(position[5]) && tick < Number(position[6])) {
+          const inRange = tick >= tickLower && tick < tickUpper;
+          if (inRange) {
             managerStakedActiveLiquidity += positionLiquidity;
           }
+          const amount0Human = Number(formatUnits(amounts.amount0, Number(decimals0)));
+          const amount1Human = Number(formatUnits(amounts.amount1, Number(decimals1)));
+          const valueUsd =
+            Number.isFinite(amount0Human) && Number.isFinite(amount1Human)
+              ? amount1Human + amount0Human * musdPerMezo
+              : null;
+          clPositions.push({
+            pair: "MUSD/MEZO",
+            tokenId: BigInt(stakedIds[index]!).toString(),
+            staked: true,
+            tickLower,
+            tickUpper,
+            inRange,
+            amount0: formatUnits(amounts.amount0, Number(decimals0)),
+            amount1: formatUnits(amounts.amount1, Number(decimals1)),
+            symbol0,
+            symbol1,
+            valueMusd: valueUsd != null && Number.isFinite(valueUsd) ? valueUsd : null,
+          });
         }
       }
     }
@@ -227,15 +254,12 @@ export async function buildBasePoolReport(input?: {
   const poolStakedLiquidity = BigInt(stakedLiquidity);
   const feeRaw = BigInt(fee);
   const range = tightestRange(tick, Number(tickSpacing));
-  const sqrtPriceX96 = BigInt(slot0[0]);
   const sqrtLower = sqrtRatioAtTick(range.tickLower);
   const sqrtUpper = sqrtRatioAtTick(range.tickUpper);
   const liquidityWithoutPortfolio =
     poolLiquidity > managerStakedActiveLiquidity
       ? poolLiquidity - managerStakedActiveLiquidity
       : 0n;
-  const sqrtPrice = Number(sqrtPriceX96) / Number(1n << 96n);
-  const musdPerMezo = sqrtPrice ** 2 * 10 ** (metadata0.decimals - metadata1.decimals);
   const managerStakedPositionValueUsd =
     managerStakedLiquidity > 0n
       ? Number(formatUnits(managerPositionAmount1, metadata1.decimals)) +
@@ -324,11 +348,7 @@ export async function buildBasePoolReport(input?: {
     tick,
     range,
     sqrtPriceX96: sqrtPriceX96.toString(),
-    priceToken1PerToken0: humanPriceToken1PerToken0(
-      sqrtPriceX96,
-      metadata0.decimals,
-      metadata1.decimals,
-    ),
+    priceToken1PerToken0: musdPerMezo,
     activeLiquidity: poolLiquidity.toString(),
     activeLiquidityWithoutManager: liquidityWithoutPortfolio.toString(),
     managerStakedLiquidity: managerStakedLiquidity.toString(),
@@ -342,6 +362,7 @@ export async function buildBasePoolReport(input?: {
         ? managerStakedPositionValueUsd
         : null,
     managerStakedTokenIds,
+    positions: clPositions,
     priceMoveDepth: {
       withPortfolio: priceMoveAmounts({
         liquidity: poolLiquidity,
