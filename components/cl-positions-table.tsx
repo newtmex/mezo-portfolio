@@ -1,3 +1,7 @@
+"use client";
+
+import { useState } from "react";
+
 import { formatPriceLabel, PriceRangeLine } from "@/components/price-range-line";
 import type { ManagerClPositionValue } from "@/lib/report/types";
 import { humanPriceToken1PerToken0 } from "@/lib/math/price";
@@ -42,6 +46,22 @@ export function ClPositionsTable({
       ? currentPrice
       : null;
 
+  const [spotBaseline, setSpotBaseline] = useState(spot);
+  const [projectedPrice, setProjectedPrice] = useState(spot);
+  if (spotBaseline !== spot) {
+    setSpotBaseline(spot);
+    setProjectedPrice(spot);
+  }
+
+  const projected =
+    projectedPrice != null && Number.isFinite(projectedPrice) && projectedPrice > 0
+      ? projectedPrice
+      : spot;
+  const showProjected =
+    spot != null &&
+    projected != null &&
+    Math.abs(projected - spot) / Math.max(spot, Number.EPSILON) >= 1e-6;
+
   return (
     <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
       <div className="mb-3 flex items-end justify-between gap-3">
@@ -60,6 +80,13 @@ export function ClPositionsTable({
                 "n/a"
               )}
               {currentTick != null ? <> · tick {currentTick}</> : null}
+              {showProjected ? (
+                <>
+                  {" "}
+                  · Projected {formatPriceLabel(projected!)}
+                  {priceUnit ? ` ${priceUnit}` : ""}
+                </>
+              ) : null}
             </p>
           ) : null}
         </div>
@@ -111,6 +138,8 @@ export function ClPositionsTable({
                           rangeLower={priceLower}
                           rangeUpper={priceUpper}
                           currentPrice={spot}
+                          projectedPrice={projected ?? spot}
+                          onProjectedPriceChange={setProjectedPrice}
                           priceUnit={priceUnit}
                           rangeTitle="Position range"
                           accent={accent}
