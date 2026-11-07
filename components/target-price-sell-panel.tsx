@@ -1,17 +1,10 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-  type PointerEvent as ReactPointerEvent,
-} from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { formatUnits } from "viem";
 
+import { formatPriceLabel, PriceRangeLine } from "@/components/price-range-line";
 import {
   type BuyToken,
   humanPriceToken1PerToken0,
@@ -20,13 +13,6 @@ import {
 } from "@/lib/math/price";
 import { sqrtRatioAtTick } from "@/lib/math/tick-math";
 import { cn, formatAmount } from "@/lib/utils";
-
-function formatPriceInput(value: number): string {
-  if (!Number.isFinite(value) || value <= 0) return "";
-  if (value >= 1000) return value.toFixed(2);
-  if (value >= 1) return value.toPrecision(6);
-  return value.toPrecision(6);
-}
 
 function formatSellAmount(amountRaw: bigint, decimals: number, symbol: string): string {
   const human = formatUnits(amountRaw, decimals);
@@ -42,87 +28,8 @@ function amountLabel(result: SellToTargetResult, decimals: number, symbol: strin
   return formatSellAmount(result.amountRaw, decimals, symbol);
 }
 
-/** Map a price onto [0, 1] across a padded [low, high] window. */
-function priceToPct(price: number, low: number, high: number): number {
-  if (!(high > low) || !Number.isFinite(price)) return 0.5;
-  return Math.max(0, Math.min(1, (price - low) / (high - low)));
-}
-
-function pctToPrice(pct: number, low: number, high: number): number {
-  const clamped = Math.max(0, Math.min(1, pct));
-  return low + clamped * (high - low);
-}
-
 function buyTokenForTarget(target: number, spot: number): BuyToken {
   return target < spot ? 1 : 0;
-}
-
-function PriceMarker({
-  pct,
-  label,
-  priceLabel,
-  tone,
-  accent,
-  draggable,
-  onPointerDown,
-}: {
-  pct: number;
-  label: string;
-  priceLabel: string;
-  tone: "current" | "projected";
-  accent: "amber" | "sky";
-  draggable?: boolean;
-  onPointerDown?: (event: ReactPointerEvent<HTMLDivElement>) => void;
-}) {
-  const isCurrent = tone === "current";
-  const lineClass = isCurrent
-    ? accent === "sky"
-      ? "bg-sky-100 shadow-[0_0_10px_rgba(186,230,253,0.75)]"
-      : "bg-amber-100 shadow-[0_0_10px_rgba(254,243,199,0.75)]"
-    : accent === "sky"
-      ? "bg-sky-300 shadow-[0_0_8px_rgba(125,211,252,0.55)]"
-      : "bg-amber-300 shadow-[0_0_8px_rgba(252,211,77,0.55)]";
-
-  return (
-    <div
-      className={cn(
-        "absolute top-1/2 z-10 -translate-x-1/2 -translate-y-1/2",
-        draggable && "cursor-ew-resize touch-none select-none",
-      )}
-      style={{ left: `${pct * 100}%` }}
-      onPointerDown={onPointerDown}
-      title={draggable ? "Drag to set projected price" : undefined}
-    >
-      {/* Vertical price marker with a larger drag hit target */}
-      <div
-        className={cn(
-          "relative flex h-10 w-6 items-center justify-center",
-          draggable && "active:cursor-ew-resize",
-        )}
-      >
-        <div className={cn("h-8 w-[2px] rounded-full", lineClass)} />
-      </div>
-      {/* Label sits beside the pointer, tucked against the range line */}
-      <div
-        className={cn(
-          "pointer-events-none absolute flex w-max flex-col leading-tight",
-          isCurrent
-            ? "bottom-[calc(50%+0.35rem)] right-[calc(50%+0.3rem)] items-end text-right"
-            : "top-[calc(50%+0.35rem)] left-[calc(50%+0.3rem)] items-start text-left",
-        )}
-      >
-        <span
-          className={cn(
-            "text-[10px] font-semibold uppercase tracking-wide",
-            isCurrent ? "text-zinc-200" : accent === "sky" ? "text-sky-200" : "text-amber-200",
-          )}
-        >
-          {label}
-        </span>
-        <span className="font-mono text-[11px] text-zinc-100">{priceLabel}</span>
-      </div>
-    </div>
-  );
 }
 
 export function TargetPriceSellPanel({
@@ -157,16 +64,8 @@ export function TargetPriceSellPanel({
     [sqrt, decimals0, decimals1],
   );
   const activeRange = useMemo(() => {
-    const lower = humanPriceToken1PerToken0(
-      sqrtRatioAtTick(tickLower),
-      decimals0,
-      decimals1,
-    );
-    const upper = humanPriceToken1PerToken0(
-      sqrtRatioAtTick(tickUpper),
-      decimals0,
-      decimals1,
-    );
+    const lower = humanPriceToken1PerToken0(sqrtRatioAtTick(tickLower), decimals0, decimals1);
+    const upper = humanPriceToken1PerToken0(sqrtRatioAtTick(tickUpper), decimals0, decimals1);
     return {
       lower: Math.min(lower, upper),
       upper: Math.max(lower, upper),
@@ -174,13 +73,10 @@ export function TargetPriceSellPanel({
   }, [tickLower, tickUpper, decimals0, decimals1]);
 
   const [buyToken, setBuyToken] = useState<BuyToken>(1);
-  const [targetInput, setTargetInput] = useState(() => formatPriceInput(currentPrice));
+  const [targetInput, setTargetInput] = useState(() => formatPriceLabel(currentPrice));
   const [priceUnitOpen, setPriceUnitOpen] = useState(false);
   const priceUnitId = useId();
-  const [dragging, setDragging] = useState(false);
-  const [lockedAxis, setLockedAxis] = useState<{ low: number; high: number } | null>(null);
 
-  const trackRef = useRef<HTMLDivElement>(null);
   const spotRef = useRef(currentPrice);
   const buyTokenRef = useRef(buyToken);
 
@@ -235,44 +131,9 @@ export function TargetPriceSellPanel({
   const withLabel = amountLabel(withResult, sellDecimals, sellSymbol);
   const withoutLabel = amountLabel(withoutResult, sellDecimals, sellSymbol);
 
-  const fittedAxis = useMemo(() => {
-    const spot = Number.isFinite(currentPrice) && currentPrice > 0 ? currentPrice : 1;
-    const projected = hasTarget ? targetPrice : spot;
-    const lo = Math.min(spot, projected, activeRange.lower);
-    const hi = Math.max(spot, projected, activeRange.upper);
-    const pad = Math.max((hi - lo) * 0.22, spot * 0.04, Number.EPSILON);
-    return {
-      low: Math.max(lo - pad, 0),
-      high: hi + pad,
-    };
-  }, [currentPrice, targetPrice, hasTarget, activeRange]);
-
-  const axisBounds = lockedAxis ?? fittedAxis;
-
-  const axis = useMemo(() => {
-    const spot = Number.isFinite(currentPrice) && currentPrice > 0 ? currentPrice : 1;
-    const projected = hasTarget ? targetPrice : spot;
-    const activeLeft = priceToPct(activeRange.lower, axisBounds.low, axisBounds.high);
-    const activeRight = priceToPct(activeRange.upper, axisBounds.low, axisBounds.high);
-    return {
-      low: axisBounds.low,
-      high: axisBounds.high,
-      currentPct: priceToPct(spot, axisBounds.low, axisBounds.high),
-      projectedPct: priceToPct(projected, axisBounds.low, axisBounds.high),
-      activeLeft,
-      activeWidth: Math.max(activeRight - activeLeft, 0.004),
-      movingLower: projected < spot,
-      nearSpot: Math.abs(projected - spot) / spot < 1e-6,
-    };
-  }, [currentPrice, targetPrice, hasTarget, axisBounds, activeRange]);
-
-  const moveLeft = Math.min(axis.currentPct, axis.projectedPct);
-  const moveWidth = Math.abs(axis.projectedPct - axis.currentPct);
-
   const applyProjectedPrice = useCallback((price: number) => {
     const spot = spotRef.current;
     if (!(price > 0) || !Number.isFinite(price)) return;
-    // Keep a tiny gap from exact spot so sell math stays directional.
     const minGap = Math.max(spot * 1e-6, Number.EPSILON);
     let next = price;
     if (Math.abs(next - spot) < minGap) {
@@ -280,7 +141,7 @@ export function TargetPriceSellPanel({
     }
     if (next <= 0) next = minGap;
 
-    setTargetInput(formatPriceInput(next));
+    setTargetInput(formatPriceLabel(next));
     const nextBuy = buyTokenForTarget(next, spot);
     if (nextBuy !== buyTokenRef.current) {
       buyTokenRef.current = nextBuy;
@@ -288,113 +149,15 @@ export function TargetPriceSellPanel({
     }
   }, []);
 
-  const priceFromClientX = useCallback(
-    (clientX: number, bounds: { low: number; high: number }) => {
-      const track = trackRef.current;
-      if (!track) return null;
-      const rect = track.getBoundingClientRect();
-      if (rect.width <= 0) return null;
-      const pct = (clientX - rect.left) / rect.width;
-      const price = pctToPrice(pct, bounds.low, bounds.high);
-      return price > 0 ? price : null;
-    },
-    [],
-  );
-
-  const endDrag = useCallback(() => {
-    setDragging(false);
-    setLockedAxis(null);
-  }, []);
-
-  const onProjectedPointerDown = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
-      if (event.button !== 0) return;
-      event.preventDefault();
-      event.stopPropagation();
-
-      const bounds = { ...fittedAxis };
-      setLockedAxis(bounds);
-      setDragging(true);
-
-      const target = event.currentTarget;
-      target.setPointerCapture(event.pointerId);
-
-      const onMove = (moveEvent: PointerEvent) => {
-        const price = priceFromClientX(moveEvent.clientX, bounds);
-        if (price != null) applyProjectedPrice(price);
-      };
-      const onUp = (upEvent: PointerEvent) => {
-        target.releasePointerCapture(upEvent.pointerId);
-        target.removeEventListener("pointermove", onMove);
-        target.removeEventListener("pointerup", onUp);
-        target.removeEventListener("pointercancel", onUp);
-        endDrag();
-      };
-
-      target.addEventListener("pointermove", onMove);
-      target.addEventListener("pointerup", onUp);
-      target.addEventListener("pointercancel", onUp);
-
-      const initial = priceFromClientX(event.clientX, bounds);
-      if (initial != null) applyProjectedPrice(initial);
-    },
-    [fittedAxis, priceFromClientX, applyProjectedPrice, endDrag],
-  );
-
-  /** Click / drag anywhere on the track to place the projected point. */
-  const onTrackPointerDown = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
-      if (event.button !== 0) return;
-      // Ignore if the event started on the projected marker (it stops propagation).
-      event.preventDefault();
-
-      const bounds = { ...fittedAxis };
-      setLockedAxis(bounds);
-      setDragging(true);
-
-      const track = event.currentTarget;
-      track.setPointerCapture(event.pointerId);
-
-      const onMove = (moveEvent: PointerEvent) => {
-        const price = priceFromClientX(moveEvent.clientX, bounds);
-        if (price != null) applyProjectedPrice(price);
-      };
-      const onUp = (upEvent: PointerEvent) => {
-        track.releasePointerCapture(upEvent.pointerId);
-        track.removeEventListener("pointermove", onMove);
-        track.removeEventListener("pointerup", onUp);
-        track.removeEventListener("pointercancel", onUp);
-        endDrag();
-      };
-
-      track.addEventListener("pointermove", onMove);
-      track.addEventListener("pointerup", onUp);
-      track.addEventListener("pointercancel", onUp);
-
-      const initial = priceFromClientX(event.clientX, bounds);
-      if (initial != null) applyProjectedPrice(initial);
-    },
-    [fittedAxis, priceFromClientX, applyProjectedPrice, endDrag],
-  );
-
   const toggleClass =
     accent === "sky"
       ? "border-sky-400/30 bg-sky-400/10 text-sky-100"
       : "border-amber-400/30 bg-amber-400/10 text-amber-100";
   const activeToggleClass =
-    accent === "sky"
-      ? "bg-sky-400/25 text-sky-50"
-      : "bg-amber-400/25 text-amber-50";
-  const thinLineClass =
-    accent === "sky" ? "bg-sky-400/35" : "bg-amber-400/35";
-  const activeRangeClass =
-    accent === "sky"
-      ? "bg-gradient-to-r from-sky-400/80 via-sky-300 to-sky-400/80"
-      : "bg-gradient-to-r from-amber-400/80 via-amber-300 to-amber-400/80";
-  const moveClass =
-    accent === "sky" ? "bg-sky-200/70" : "bg-amber-200/70";
+    accent === "sky" ? "bg-sky-400/25 text-sky-50" : "bg-amber-400/25 text-amber-50";
 
-  const amountAlign = axis.movingLower ? "items-start text-left" : "items-end text-right";
+  const amountAlign =
+    hasTarget && targetPrice < currentPrice ? "items-start text-left" : "items-end text-right";
 
   return (
     <div className="flex flex-col gap-3">
@@ -432,16 +195,26 @@ export function TargetPriceSellPanel({
                     const value = event.target.value;
                     setTargetInput(value);
                     const next = Number(value);
-                    if (Number.isFinite(next) && next > 0 && Number.isFinite(currentPrice) && currentPrice > 0) {
+                    if (
+                      Number.isFinite(next) &&
+                      next > 0 &&
+                      Number.isFinite(currentPrice) &&
+                      currentPrice > 0
+                    ) {
                       if (Math.abs(next - currentPrice) / currentPrice >= 1e-6) {
                         setBuyToken(buyTokenForTarget(next, currentPrice));
                       }
                     }
                   }}
                   className="min-w-0 flex-1 bg-transparent px-3 py-2 font-mono text-sm text-zinc-100 outline-none placeholder:text-zinc-600"
-                  placeholder={formatPriceInput(currentPrice) || "0"}
+                  placeholder={formatPriceLabel(currentPrice) || "0"}
                 />
-                <span className={cn("inline-flex shrink-0 items-center rounded-r-lg border-l p-0.5", toggleClass)}>
+                <span
+                  className={cn(
+                    "inline-flex shrink-0 items-center rounded-r-lg border-l p-0.5",
+                    toggleClass,
+                  )}
+                >
                   <button
                     type="button"
                     aria-pressed={buyToken === 0}
@@ -480,57 +253,16 @@ export function TargetPriceSellPanel({
                 </p>
               </div>
 
-              <div
-                ref={trackRef}
-                className={cn(
-                  "relative mx-1 h-14 touch-none",
-                  dragging ? "cursor-ew-resize" : "cursor-pointer",
-                )}
-                onPointerDown={onTrackPointerDown}
-              >
-                <div
-                  className={cn(
-                    "pointer-events-none absolute inset-x-0 top-1/2 h-0.5 -translate-y-1/2 rounded-full",
-                    thinLineClass,
-                  )}
-                />
-                <div
-                  className={cn(
-                    "pointer-events-none absolute top-1/2 h-3 -translate-y-1/2 rounded-full",
-                    activeRangeClass,
-                  )}
-                  style={{ left: `${axis.activeLeft * 100}%`, width: `${axis.activeWidth * 100}%` }}
-                  title={`Active tick spacing · ${formatPriceInput(activeRange.lower)} → ${formatPriceInput(activeRange.upper)}`}
-                />
-                {!axis.nearSpot && hasTarget ? (
-                  <div
-                    className={cn(
-                      "pointer-events-none absolute top-1/2 h-0.5 -translate-y-1/2 rounded-full",
-                      moveClass,
-                    )}
-                    style={{ left: `${moveLeft * 100}%`, width: `${Math.max(moveWidth * 100, 0.5)}%` }}
-                  />
-                ) : null}
-
-                <PriceMarker
-                  pct={axis.currentPct}
-                  label="Current"
-                  priceLabel={formatPriceInput(currentPrice) || "n/a"}
-                  tone="current"
-                  accent={accent}
-                />
-                {hasTarget ? (
-                  <PriceMarker
-                    pct={axis.projectedPct}
-                    label="Projected"
-                    priceLabel={formatPriceInput(targetPrice) || "n/a"}
-                    tone="projected"
-                    accent={accent}
-                    draggable
-                    onPointerDown={onProjectedPointerDown}
-                  />
-                ) : null}
-              </div>
+              <PriceRangeLine
+                rangeLower={activeRange.lower}
+                rangeUpper={activeRange.upper}
+                currentPrice={currentPrice}
+                projectedPrice={hasTarget ? targetPrice : undefined}
+                onProjectedPriceChange={applyProjectedPrice}
+                priceUnit={`${symbol1}/${symbol0}`}
+                rangeTitle="Active tick spacing"
+                accent={accent}
+              />
 
               <div className={cn("mt-2 flex min-h-[2.75rem] flex-col justify-start", amountAlign)}>
                 <p className="text-[10px] uppercase tracking-wide text-zinc-500">Without portfolio</p>
@@ -538,17 +270,10 @@ export function TargetPriceSellPanel({
                   {sharedError ? "—" : `Sell ${withoutLabel}`}
                 </p>
               </div>
-
-              <div className="mt-2 flex justify-between text-[10px] text-zinc-600">
-                <span>{formatPriceInput(axis.low)}</span>
-                <span>{symbol1}/{symbol0}</span>
-                <span>{formatPriceInput(axis.high)}</span>
-              </div>
             </div>
           </div>
         ) : null}
       </div>
-
     </div>
   );
 }

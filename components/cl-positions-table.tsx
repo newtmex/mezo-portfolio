@@ -1,15 +1,8 @@
-import { PriceRangeLine } from "@/components/price-range-line";
+import { formatPriceLabel, PriceRangeLine } from "@/components/price-range-line";
 import type { ManagerClPositionValue } from "@/lib/report/types";
 import { humanPriceToken1PerToken0 } from "@/lib/math/price";
 import { sqrtRatioAtTick } from "@/lib/math/tick-math";
 import { formatAmount, formatUsd } from "@/lib/utils";
-
-function formatPrice(value: number): string {
-  if (!Number.isFinite(value) || value <= 0) return "n/a";
-  if (value >= 1000) return value.toFixed(2);
-  if (value >= 1) return value.toPrecision(6);
-  return value.toPrecision(6);
-}
 
 function priceAtTick(tick: number, decimals0: number, decimals1: number): number {
   return humanPriceToken1PerToken0(sqrtRatioAtTick(tick), decimals0, decimals1);
@@ -44,6 +37,10 @@ export function ClPositionsTable({
     typeof decimals1 === "number" &&
     Number.isFinite(decimals0) &&
     Number.isFinite(decimals1);
+  const spot =
+    currentPrice != null && Number.isFinite(currentPrice) && currentPrice > 0
+      ? currentPrice
+      : null;
 
   return (
     <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
@@ -51,12 +48,12 @@ export function ClPositionsTable({
         <div>
           <h2 className="text-sm font-semibold text-zinc-100">{title}</h2>
           <p className="text-xs text-zinc-500">{subtitle}</p>
-          {currentTick != null || currentPrice != null ? (
+          {currentTick != null || spot != null ? (
             <p className="mt-1 font-mono text-[11px] text-zinc-400">
               Current{" "}
-              {currentPrice != null ? (
+              {spot != null ? (
                 <>
-                  {formatPrice(currentPrice)}
+                  {formatPriceLabel(spot)}
                   {priceUnit ? ` ${priceUnit}` : ""}
                 </>
               ) : (
@@ -77,8 +74,7 @@ export function ClPositionsTable({
               <tr className="border-b border-white/10">
                 <th className="px-2 py-2 font-medium">NFT</th>
                 <th className="px-2 py-2 font-medium">Staked</th>
-                <th className="min-w-[14rem] px-2 py-2 font-medium">Range</th>
-                <th className="px-2 py-2 font-medium">In range</th>
+                <th className="min-w-[16rem] px-2 py-2 font-medium">Range</th>
                 <th className="px-2 py-2 font-medium">Token0</th>
                 <th className="px-2 py-2 font-medium">Token1</th>
                 <th className="px-2 py-2 font-medium">Value</th>
@@ -97,8 +93,8 @@ export function ClPositionsTable({
                     key={`${row.pair}-${row.tokenId}`}
                     className="border-b border-white/5 text-zinc-200"
                   >
-                    <td className="px-2 py-2.5 font-mono">#{row.tokenId}</td>
-                    <td className="px-2 py-2.5">
+                    <td className="px-2 py-2.5 align-top font-mono">#{row.tokenId}</td>
+                    <td className="px-2 py-2.5 align-top">
                       <span
                         className={
                           row.staked
@@ -109,15 +105,15 @@ export function ClPositionsTable({
                         {row.staked ? "yes" : "no"}
                       </span>
                     </td>
-                    <td className="px-2 py-2.5">
-                      {priceLower != null && priceUpper != null ? (
+                    <td className="px-2 py-3 align-top">
+                      {priceLower != null && priceUpper != null && spot != null ? (
                         <PriceRangeLine
                           rangeLower={priceLower}
                           rangeUpper={priceUpper}
-                          currentPrice={currentPrice}
+                          currentPrice={spot}
                           priceUnit={priceUnit}
+                          rangeTitle="Position range"
                           accent={accent}
-                          compact
                         />
                       ) : (
                         <span className="font-mono text-xs">
@@ -125,18 +121,15 @@ export function ClPositionsTable({
                         </span>
                       )}
                     </td>
-                    <td className="px-2 py-2.5">
-                      <span className={row.inRange ? "text-emerald-300" : "text-rose-300"}>
-                        {row.inRange ? "yes" : "no"}
-                      </span>
-                    </td>
-                    <td className="px-2 py-2.5 font-mono text-xs">
+                    <td className="px-2 py-2.5 align-top font-mono text-xs">
                       {formatAmount(row.amount0)} {row.symbol0}
                     </td>
-                    <td className="px-2 py-2.5 font-mono text-xs">
+                    <td className="px-2 py-2.5 align-top font-mono text-xs">
                       {formatAmount(row.amount1)} {row.symbol1}
                     </td>
-                    <td className="px-2 py-2.5 font-mono">{formatUsd(row.valueMusd)}</td>
+                    <td className="px-2 py-2.5 align-top font-mono">
+                      {formatUsd(row.valueMusd)}
+                    </td>
                   </tr>
                 );
               })}
